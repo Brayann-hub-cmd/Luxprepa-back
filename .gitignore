@@ -1,0 +1,10 @@
+.env
+uploads/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.vscode/*
+!.vscode/settings.json
