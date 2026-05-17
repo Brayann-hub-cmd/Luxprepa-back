@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from rest_framework import serializers
-from .models import User, Eleve, Admin, Prof
-
+from .models import User, Eleve, Admin, Prof, Concours, Matiere, MatiereConcours,Session, Inscription, Paiement, Eleve
+from django.db.models import Sum
 def generer_code_sms():
     return str(random.randint(100000, 999999))
 
@@ -204,3 +204,294 @@ class ConnexionSerializer(serializers.Serializer):
                 "role": user.role,
             }
         }
+
+# ───────────────────────────────────────────
+# MATIERE
+# ───────────────────────────────────────────
+
+class MatiereSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Matiere
+        fields = ['id', 'nom', 'description']
+
+
+# ───────────────────────────────────────────
+# MATIERE CONCOURS (avec coefficient)
+# ───────────────────────────────────────────
+
+class MatiereConcourSerializer(serializers.ModelSerializer):
+    matiere = MatiereSerializer(read_only=True)
+    matiere_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = MatiereConcours
+        fields = ['id', 'matiere', 'matiere_id', 'coefficient']
+
+
+# ───────────────────────────────────────────
+# CONCOURS - LECTURE
+# ───────────────────────────────────────────
+
+class ConcoursListSerializer(serializers.ModelSerializer):
+    """Serializer léger pour la liste des concours"""
+    nombre_matieres = serializers.SerializerMethodField()
+    nombre_inscrits = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Concours
+        fields = [
+            'id', 'nom', 'description',
+            'inscription_prepa', 'montant_prepa',
+            'date_debut', 'date_fin',
+            'nombre_matieres', 'nombre_inscrits',
+        ]
+
+    def get_nombre_matieres(self, obj) -> int:
+        return obj.matiere_concours.count()
+
+    def get_nombre_inscrits(self, obj) -> int:
+        return obj.inscriptions.filter(status='validee').count()
+
+
+class ConcoursDetailSerializer(serializers.ModelSerializer):
+    """Serializer complet avec matières et coefficients"""
+    matieres = serializers.SerializerMethodField()
+    nombre_inscrits = serializers.SerializerMethodField()
+    sessions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Concours
+        fields = [
+            'id', 'nom', 'description',
+            'inscription_prepa', 'montant_prepa',
+            'date_debut', 'date_fin',
+            'matieres', 'sessions', 'nombre_inscrits',
+        ]
+
+    def get_matieres(self, obj):
+        matiere_concours = obj.matiere_concours.select_related('matiere').all()
+        return [
+            {
+                "id": str(mc.matiere.id),
+                "nom": mc.matiere.nom,
+                "description": mc.matiere.description,
+                "coefficient": mc.coefficient,
+            }
+            for mc in matiere_concours
+        ]
+
+    def get_nombre_inscrits(self, obj) -> int:
+        return obj.inscriptions.filter(status='validee').count()
+
+    def get_sessions(self, obj):
+        return SessionSerializer(obj.sessions.all(), many=True).data
+
+
+# ───────────────────────────────────────────
+# CONCOURS - CRÉATION / MODIFICATION
+# ───────────────────────────────────────────
+
+class MatiereCoefficientInput(serializers.Serializer):
+    """Structure attendue pour chaque matière lors de la création"""
+    matiere_id = serializers.UUIDField()
+    coefficient = serializers.IntegerField(min_value=1)
+
+
+class ConcoursCreateSerializer(serializers.Serializer):
+    nom = serializers.CharField(max_length=200)
+    description = serializers.CharField(required=False, allow_blank=True)
+    inscription_prepa = serializers.IntegerField(min_value=0)
+    montant_prepa = serializers.IntegerField(min_value=0)
+    date_debut = serializers.DateField()
+    date_fin = serializers.DateField()
+    matieres = MatiereCoefficientInput(many=True)  # liste de matières avec coefficients
+
+    def validate(self, data):
+        # Vérifier que date_fin > date_debut
+        if data['date_fin'] <= data['date_debut']:
+            raise serializers.ValidationError({
+                "date_fin": "La date de fin doit être après la date de début."
+            })
+
+        # Vérifier que montant_prepa >= inscription_prepa
+        if data['montant_prepa'] < data['inscription_prepa']:
+            raise serializers.ValidationError({
+                "montant_prepa": "Le montant total doit être supérieur ou égal au montant d'inscription."
+            })
+
+        # Vérifier que toutes les matières existent
+        for item in data['matieres']:
+            if not Matiere.objects.filter(id=item['matiere_id']).exists():
+                raise serializers.ValidationError({
+                    "matieres": f"Matière {item['matiere_id']} introuvable."
+                })
+
+        return data
+
+    def create(self, validated_data):
+        matieres_data = validated_data.pop('matieres')
+
+        # Créer le concours
+        concours = Concours.objects.create(**validated_data)
+
+        # Associer les matières avec leurs coefficients
+        for item in matieres_data:
+            MatiereConcours.objects.create(
+                concours=concours,
+                matiere_id=item['matiere_id'],
+                coefficient=item['coefficient'],
+            )
+
+        return concours
+
+    def update(self, instance, validated_data):
+        matieres_data = validated_data.pop('matieres', None)
+
+        # Mettre à jour les champs simples
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Mettre à jour les matières si fournies
+        if matieres_data is not None:
+            # Supprimer les anciennes associations
+            instance.matiere_concours.all().delete()
+            # Recréer les nouvelles
+            for item in matieres_data:
+                MatiereConcours.objects.create(
+                    concours=instance,
+                    matiere_id=item['matiere_id'],
+                    coefficient=item['coefficient'],
+                )
+
+        return instance
+
+
+# ───────────────────────────────────────────
+# SESSION
+# ───────────────────────────────────────────
+
+class SessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Session
+        fields = ['id', 'nom', 'date', 'concours']
+
+
+# ───────────────────────────────────────────
+# INSCRIPTION
+# ───────────────────────────────────────────
+
+class InscriptionSerializer(serializers.ModelSerializer):
+    concours = ConcoursListSerializer(read_only=True)
+    concours_id = serializers.UUIDField(write_only=True)
+    total_paye = serializers.SerializerMethodField()
+    reste_a_payer = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Inscription
+        fields = [
+            'id', 'concours', 'concours_id',
+            'status', 'created_at',
+            'total_paye', 'reste_a_payer',
+        ]
+        read_only_fields = ['status', 'created_at']
+
+    def get_total_paye(self, obj) -> int:
+        total = obj.paiements.aggregate(Sum('montant'))['montant__sum']
+        return total or 0
+
+    def get_reste_a_payer(self, obj) -> int:
+        total_paye = self.get_total_paye(obj)
+        return max(0, obj.concours.montant_prepa - total_paye)
+
+    def validate_concours_id(self, value):
+        if not Concours.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Ce concours n'existe pas.")
+        return value
+
+    def create(self, validated_data):
+        eleve = self.context['request'].user_obj  # injecté depuis la vue
+        concours_id = validated_data['concours_id']
+
+        # Vérifier que l'élève n'est pas déjà inscrit
+        if Inscription.objects.filter(eleve=eleve, concours_id=concours_id).exists():
+            raise serializers.ValidationError("Vous êtes déjà inscrit à ce concours.")
+
+        return Inscription.objects.create(
+            eleve=eleve,
+            concours_id=concours_id,
+            status='en_attente',
+        )
+
+
+# ───────────────────────────────────────────
+# PAIEMENT
+# ───────────────────────────────────────────
+
+class PaiementSerializer(serializers.ModelSerializer):
+    inscription_id = serializers.UUIDField(write_only=True)
+    total_paye = serializers.SerializerMethodField()
+    reste_a_payer = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Paiement
+        fields = [
+            'id', 'inscription_id', 'montant',
+            'statut', 'created_at',
+            'total_paye', 'reste_a_payer',
+        ]
+        read_only_fields = ['statut', 'created_at']
+
+    def get_total_paye(self, obj) -> int:
+        total = Paiement.objects.filter(
+            inscription=obj.inscription
+        ).aggregate(Sum('montant'))['montant__sum']
+        return total or 0
+
+    def get_reste_a_payer(self, obj) -> int:
+        total_paye = self.get_total_paye(obj)
+        return max(0, obj.inscription.concours.montant_prepa - total_paye)
+
+    def validate(self, data):
+        inscription_id = data.get('inscription_id')
+        montant = data.get('montant')
+
+        try:
+            inscription = Inscription.objects.get(id=inscription_id)
+        except Inscription.DoesNotExist:
+            raise serializers.ValidationError({
+                "inscription_id": "Inscription introuvable."
+            })
+
+        # Vérifier que le paiement ne dépasse pas le montant total
+        total_paye = Paiement.objects.filter(
+            inscription=inscription
+        ).aggregate(Sum('montant'))['montant__sum'] or 0
+
+        if total_paye >= inscription.concours.montant_prepa:
+            raise serializers.ValidationError({
+                "montant": "Ce concours est déjà entièrement payé."
+            })
+
+        data['inscription'] = inscription
+        return data
+
+    def create(self, validated_data):
+        validated_data.pop('inscription_id')
+        return Paiement.objects.create(**validated_data)
+
+class SessionSerializer(serializers.ModelSerializer):
+    concours = ConcoursListSerializer(read_only=True)
+    concours_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = Session
+        fields = ['id', 'nom', 'date', 'concours', 'concours_id']
+
+    def validate_concours_id(self, value):
+        if not Concours.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Ce concours n'existe pas.")
+        return value
+
+    def create(self, validated_data):
+        return Session.objects.create(**validated_data)

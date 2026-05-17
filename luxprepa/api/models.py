@@ -167,24 +167,24 @@ class Inscription(models.Model):
 
 class Paiement(models.Model):
     STATUT_CHOICES = [
-        (0, 'En attente'),
-        (1, 'En cours'),
-        (2, 'Payé'),
-        (3, 'Échoué'),
-        (4, 'Remboursé'),
+        ('en_attente', 'En attente'),
+        ('en_cours', 'En cours'),      
+        ('paye', 'Payé'),              
+        ('echoue', 'Échoué'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     inscription = models.ForeignKey(
         Inscription,
         on_delete=models.CASCADE,
-        related_name='paiements',
-        null=True,
-        blank=True
+        related_name='paiements'
     )
-    eleve = models.ForeignKey(Eleve, on_delete=models.CASCADE, related_name='paiements')
-    statut = models.IntegerField(choices=STATUT_CHOICES, default=0)
-    montant = models.IntegerField()
+    montant = models.IntegerField() 
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default='en_attente'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -192,6 +192,30 @@ class Paiement(models.Model):
 
     def __str__(self):
         return f"Paiement {self.montant} FCFA - {self.get_statut_display()}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.mettre_a_jour_statut()
+
+    def mettre_a_jour_statut(self):
+        concours = self.inscription.concours
+
+        # Somme de tous les versements pour cette inscription
+        from django.db.models import Sum
+        total_paye = Paiement.objects.filter(
+            inscription=self.inscription
+        ).aggregate(Sum('montant'))['montant__sum'] or 0
+
+        # Déterminer le statut selon le total payé
+        if total_paye >= concours.montant_prepa + concours.inscription_prepa:
+            nouveau_statut = 'paye'
+        elif total_paye >= concours.inscription_prepa:
+            nouveau_statut = 'en_cours'
+        else:
+            nouveau_statut = 'en_attente'
+
+        # Mettre à jour sans rappeler save() pour éviter la récursion
+        Paiement.objects.filter(id=self.id).update(statut=nouveau_statut)
 
 
 class Annonce(models.Model):
@@ -234,6 +258,3 @@ class Note(models.Model):
 
     class Meta:
         db_table = 'notes'
-
-    def __str__(self):
-        return f"{self.eleve} - {self.valeur}/20"
