@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from rest_framework import serializers
-from .models import User, Eleve, Admin, Prof, Concours, Matiere, MatiereConcours,Session, Inscription, Paiement, Eleve
+from .models import User, Eleve, Admin, Prof, Concours, Matiere, MatiereConcours,Session, Inscription, Paiement, Eleve, Note,Annonce
 from django.db.models import Sum
 def generer_code_sms():
     return str(random.randint(100000, 999999))
@@ -233,7 +233,6 @@ class MatiereConcourSerializer(serializers.ModelSerializer):
 # ───────────────────────────────────────────
 
 class ConcoursListSerializer(serializers.ModelSerializer):
-    """Serializer léger pour la liste des concours"""
     nombre_matieres = serializers.SerializerMethodField()
     nombre_inscrits = serializers.SerializerMethodField()
 
@@ -254,7 +253,6 @@ class ConcoursListSerializer(serializers.ModelSerializer):
 
 
 class ConcoursDetailSerializer(serializers.ModelSerializer):
-    """Serializer complet avec matières et coefficients"""
     matieres = serializers.SerializerMethodField()
     nombre_inscrits = serializers.SerializerMethodField()
     sessions = serializers.SerializerMethodField()
@@ -286,13 +284,7 @@ class ConcoursDetailSerializer(serializers.ModelSerializer):
     def get_sessions(self, obj):
         return SessionSerializer(obj.sessions.all(), many=True).data
 
-
-# ───────────────────────────────────────────
-# CONCOURS - CRÉATION / MODIFICATION
-# ───────────────────────────────────────────
-
 class MatiereCoefficientInput(serializers.Serializer):
-    """Structure attendue pour chaque matière lors de la création"""
     matiere_id = serializers.UUIDField()
     coefficient = serializers.IntegerField(min_value=1)
 
@@ -402,7 +394,7 @@ class InscriptionSerializer(serializers.ModelSerializer):
 
     def get_reste_a_payer(self, obj) -> int:
         total_paye = self.get_total_paye(obj)
-        return max(0, obj.concours.montant_prepa - total_paye)
+        return max(0, obj.concours.montant_prepa +obj.concours.inscription_prepa - total_paye)
 
     def validate_concours_id(self, value):
         if not Concours.objects.filter(id=value).exists():
@@ -422,8 +414,6 @@ class InscriptionSerializer(serializers.ModelSerializer):
             concours_id=concours_id,
             status='en_attente',
         )
-
-
 # ───────────────────────────────────────────
 # PAIEMENT
 # ───────────────────────────────────────────
@@ -450,7 +440,7 @@ class PaiementSerializer(serializers.ModelSerializer):
 
     def get_reste_a_payer(self, obj) -> int:
         total_paye = self.get_total_paye(obj)
-        return max(0, obj.inscription.concours.montant_prepa - total_paye)
+        return max(0, obj.inscription.concours.montant_prepa +obj.inscription.concours.inscription_prepa - total_paye)
 
     def validate(self, data):
         inscription_id = data.get('inscription_id')
@@ -468,7 +458,7 @@ class PaiementSerializer(serializers.ModelSerializer):
             inscription=inscription
         ).aggregate(Sum('montant'))['montant__sum'] or 0
 
-        if total_paye >= inscription.concours.montant_prepa:
+        if total_paye >= inscription.concours.montant_prepa+inscription.concours.inscription_prepa:
             raise serializers.ValidationError({
                 "montant": "Ce concours est déjà entièrement payé."
             })
@@ -495,3 +485,183 @@ class SessionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return Session.objects.create(**validated_data)
+
+class NoteSerializer(serializers.ModelSerializer):
+    eleve_nom = serializers.SerializerMethodField()
+    prof_nom = serializers.SerializerMethodField()
+    matiere_nom = serializers.SerializerMethodField()
+    session_nom = serializers.SerializerMethodField()
+
+    # Champs write_only pour la création
+    eleve_id = serializers.UUIDField(write_only=True)
+    prof_id = serializers.UUIDField(write_only=True)
+    session_id = serializers.UUIDField(write_only=True)
+    matiere_concours_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = Note
+        fields = [
+            'id', 'valeur', 'created_at',
+            'eleve_id', 'prof_id', 'session_id', 'matiere_concours_id',
+            'eleve_nom', 'prof_nom', 'matiere_nom', 'session_nom',
+        ]
+        read_only_fields = ['created_at']
+
+    def get_eleve_nom(self, obj) -> str:
+        return f"{obj.eleve.prenom} {obj.eleve.nom}"
+
+    def get_prof_nom(self, obj) -> str:
+        if obj.prof:
+            return f"{obj.prof.prenom} {obj.prof.nom}"
+        return "N/A"
+
+    def get_matiere_nom(self, obj) -> str:
+        if obj.matiere_concours:
+            return obj.matiere_concours.matiere.nom
+        return "N/A"
+
+    def get_session_nom(self, obj) -> str:
+        return obj.session.nom
+
+    def validate_valeur(self, value):
+        if value < 0 or value > 20:
+            raise serializers.ValidationError("La note doit être entre 0 et 20.")
+        return value
+
+    def validate(self, data):
+        # Vérifier que l'élève existe
+        try:
+            eleve = Eleve.objects.get(id=data['eleve_id'])
+        except Eleve.DoesNotExist:
+            raise serializers.ValidationError({"eleve_id": "Élève introuvable."})
+
+        # Vérifier que le prof existe
+        try:
+            prof = Prof.objects.get(id=data['prof_id'])
+        except Prof.DoesNotExist:
+            raise serializers.ValidationError({"prof_id": "Professeur introuvable."})
+
+        # Vérifier que la session existe
+        try:
+            session = Session.objects.get(id=data['session_id'])
+        except Session.DoesNotExist:
+            raise serializers.ValidationError({"session_id": "Session introuvable."})
+
+        # Vérifier que la matière_concours existe
+        try:
+            matiere_concours = MatiereConcours.objects.get(id=data['matiere_concours_id'])
+        except MatiereConcours.DoesNotExist:
+            raise serializers.ValidationError({"matiere_concours_id": "Matière introuvable."})
+
+        # Vérifier qu'une note n'existe pas déjà pour cet élève/session/matière
+        if Note.objects.filter(
+            eleve=eleve,
+            session=session,
+            matiere_concours=matiere_concours
+        ).exists():
+            raise serializers.ValidationError(
+                "Une note existe déjà pour cet élève dans cette session et cette matière."
+            )
+
+        # Injecter les objets résolus
+        data['eleve'] = eleve
+        data['prof'] = prof
+        data['session'] = session
+        data['matiere_concours'] = matiere_concours
+        return data
+
+    def create(self, validated_data):
+        # Supprimer les champs UUID bruts, on a déjà les objets
+        validated_data.pop('eleve_id')
+        validated_data.pop('prof_id')
+        validated_data.pop('session_id')
+        validated_data.pop('matiere_concours_id')
+        return Note.objects.create(**validated_data)
+
+
+class NoteUpdateSerializer(serializers.ModelSerializer):
+    """Serializer léger uniquement pour modifier la valeur d'une note"""
+    class Meta:
+        model = Note
+        fields = ['valeur']
+
+    def validate_valeur(self, value):
+        if value < 0 or value > 20:
+            raise serializers.ValidationError("La note doit être entre 0 et 20.")
+        return value
+
+
+# ───────────────────────────────────────────
+# SESSION
+# ───────────────────────────────────────────
+
+class SessionSerializer(serializers.ModelSerializer):
+    concours_nom = serializers.SerializerMethodField()
+    concours_id = serializers.UUIDField(write_only=True)
+    nombre_notes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Session
+        fields = [
+            'id', 'nom', 'date',
+            'concours_id', 'concours_nom',
+            'nombre_notes',
+        ]
+
+    def get_concours_nom(self, obj) -> str:
+        if obj.concours:
+            return obj.concours.nom
+        return "N/A"
+
+    def get_nombre_notes(self, obj) -> int:
+        return obj.notes.count()
+
+    def validate_concours_id(self, value):
+        if not Concours.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Ce concours n'existe pas.")
+        return value
+
+    def create(self, validated_data):
+        return Session.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+# ───────────────────────────────────────────
+# ANNONCE
+# ───────────────────────────────────────────
+
+class AnnonceSerializer(serializers.ModelSerializer):
+    admin_nom = serializers.SerializerMethodField()
+    admin_id = serializers.UUIDField(write_only=True, required=False)
+
+    class Meta:
+        model = Annonce
+        fields = [
+            'id', 'titre', 'contenu', 'type',
+            'is_public', 'created_at',
+            'admin_id', 'admin_nom',
+        ]
+        read_only_fields = ['created_at']
+
+    def get_admin_nom(self, obj) -> str:
+        if obj.admin:
+            return f"{obj.admin.prenom} {obj.admin.nom}"
+        return "N/A"
+
+    def create(self, validated_data):
+        # L'admin est injecté depuis la vue
+        admin = self.context.get('admin')
+        validated_data.pop('admin_id', None)
+        return Annonce.objects.create(admin=admin, **validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop('admin_id', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance

@@ -1,7 +1,8 @@
 import uuid
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
-
+from django.utils import timezone
+from datetime import timedelta
 
 class User(models.Model):
     ROLE_CHOICES = [
@@ -27,6 +28,9 @@ class User(models.Model):
     def save(self, *args, **kwargs):
         if self.password and not self.password.startswith('pbkdf2_'):
             self.password = make_password(self.password)
+        super().save(*args, **kwargs)
+ 
+    def save_without_hashing(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
     def verifier_password(self, raw_password):
@@ -73,6 +77,47 @@ class Prof(User):
     def noter(self):
         pass
 
+
+class InscriptionTemporaire(models.Model):
+    ROLE_CHOICES = [
+        ('admin', 'Admin'),
+        ('eleve', 'Élève'),
+        ('prof', 'Professeur'),
+    ]
+ 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nom = models.CharField(max_length=100)
+    prenom = models.CharField(max_length=100)
+    email = models.EmailField(blank=True, null=True)
+    telephone = models.CharField(max_length=20, unique=True)
+    password_hash = models.CharField(max_length=255)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+ 
+    # Champs spécifiques élève
+    date_naissance = models.DateField(null=True, blank=True)
+    tel_parent = models.CharField(max_length=20, blank=True, null=True)
+ 
+    # Champs spécifiques prof
+    specialite = models.CharField(max_length=100, blank=True, null=True)
+ 
+    # Code de confirmation
+    code_sms = models.CharField(max_length=6)
+    code_expire_at = models.DateTimeField()  
+    tentatives = models.IntegerField(default=0)
+ 
+    created_at = models.DateTimeField(auto_now_add=True)
+ 
+    class Meta:
+        db_table = 'inscriptions_temporaires'
+ 
+    def est_expire(self):
+        return timezone.now() > self.code_expire_at
+ 
+    def trop_de_tentatives(self):
+        return self.tentatives >= 3
+ 
+    def __str__(self):
+        return f"{self.prenom} {self.nom} ({self.telephone})"
 
 class Matiere(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
