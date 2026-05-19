@@ -402,7 +402,7 @@ class InscriptionSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        eleve = self.context['request'].user_obj  # injecté depuis la vue
+        eleve = self.context['request'].user_obj 
         concours_id = validated_data['concours_id']
 
         # Vérifier que l'élève n'est pas déjà inscrit
@@ -523,10 +523,10 @@ class NoteSerializer(serializers.ModelSerializer):
     def get_session_nom(self, obj) -> str:
         return obj.session.nom
 
-    def validate_valeur(self, value):
-        if value < 0 or value > 20:
-            raise serializers.ValidationError("La note doit être entre 0 et 20.")
-        return value
+    # def validate_valeur(self, value):
+    #     if value < 0 or value > 20:
+    #         raise serializers.ValidationError("La note doit être entre 0 et 20.")
+    #     return value
 
     def validate(self, data):
         # Vérifier que l'élève existe
@@ -585,10 +585,10 @@ class NoteUpdateSerializer(serializers.ModelSerializer):
         model = Note
         fields = ['valeur']
 
-    def validate_valeur(self, value):
-        if value < 0 or value > 20:
-            raise serializers.ValidationError("La note doit être entre 0 et 20.")
-        return value
+    # def validate_valeur(self, value):
+    #     if value < 0 or value > 20:
+    #         raise serializers.ValidationError("La note doit être entre 0 et 20.")
+    #     return value
 
 
 # ───────────────────────────────────────────

@@ -10,13 +10,8 @@ from .concours_views import (
 )
 
 from .notes_views import (
-     # ── Notes ──
     NoteListView, NoteDetailView,
- 
-    # ── Sessions ──
     SessionListView, SessionDetailView,
- 
-    # ── Annonces ──
     AnnonceListView, AnnonceDetailView,
 )
 
@@ -52,21 +47,12 @@ urlpatterns = [
     # ── Paiements ──
     path('paiements/', PaiementListView.as_view(), name='paiement-list'),
 
-    # ════════════════════════════════════════
-    # SESSIONS
-    # ════════════════════════════════════════
     path('sessions/', SessionListView.as_view(), name='session-list'),
     path('sessions/<uuid:session_id>/', SessionDetailView.as_view(), name='session-detail'),
  
-    # ════════════════════════════════════════
-    # NOTES
-    # ════════════════════════════════════════
     path('notes/', NoteListView.as_view(), name='note-list'),
     path('notes/<uuid:note_id>/', NoteDetailView.as_view(), name='note-detail'),
  
-    # ════════════════════════════════════════
-    # ANNONCES
-    # ════════════════════════════════════════
     path('annonces/', AnnonceListView.as_view(), name='annonce-list'),
     path('annonces/<uuid:annonce_id>/', AnnonceDetailView.as_view(), name='annonce-detail'),
 ]
