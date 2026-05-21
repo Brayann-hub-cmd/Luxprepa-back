@@ -6,12 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import RegisterSerializer, ConnexionSerializer
 from .models import User,Eleve,Prof
-
-
-# ───────────────────────────────────────────
-# UTILITAIRE : Décoder le token JWT
-# ───────────────────────────────────────────
-
+from .permissions import IsAdminRole
+from rest_framework.parsers import MultiPartParser,FormParser
 def verifier_token(request):
     
     auth_header = request.headers.get('Authorization')
@@ -27,7 +23,8 @@ def verifier_token(request):
         return None
 
 class InscriptionView(APIView):
-   
+    permission_classes = [IsAdminRole]
+    parser_classes = [MultiPartParser, FormParser]
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
 
@@ -37,13 +34,11 @@ class InscriptionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # create() retourne (user, code)
         user, code = serializer.save()
 
         return Response(
             {
-                "message": "Inscription réussie.",
-                "user_id": str(user.id),
+                "message": f"Inscription réussie. {user.prenom} {user.nom}",
             },
             status=status.HTTP_201_CREATED
         )
