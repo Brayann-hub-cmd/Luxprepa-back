@@ -72,6 +72,15 @@ def envoyer_sms_mtn(telephone, message):
 
 
 def envoyer_sms(telephone, message):
+
+    #Vu que les api sms orange et mtn sont payantes on test en mode dev d'abord
+    if settings.SMS_MODE == 'dev':
+        print("\n"+'='*40)
+        print(f"SMS DEV - Destinataire : {telephone}")
+        print(f" Code confirmation: {message}")
+        print("="*40+"\n")
+        return True
+
     operateur = detecter_operateur(telephone)
 
     if operateur == 'orange':
@@ -97,7 +106,7 @@ def generer_token_jwt(user):
 # INSCRIPTION
 # ───────────────────────────────────────────
 
-class InscriptionSerializer(serializers.Serializer):
+class RegisterSerializer(serializers.Serializer):
     nom = serializers.CharField(max_length=100)
     prenom = serializers.CharField(max_length=100)
     telephone = serializers.CharField(max_length=20)

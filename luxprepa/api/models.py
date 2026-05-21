@@ -52,9 +52,13 @@ class Admin(User):
 
 
 class Eleve(User):
+    NIVEAU_CHOICES = [
+        ('tle','Terminale'),
+        ('post_bac', 'Post-Bacc')
+    ]
     date_naissance = models.DateField(null=True, blank=True)
     tel_parent = models.CharField(max_length=20, blank=True, null=True)
-
+    niveau = models.CharField(max_length=20,choices=NIVEAU_CHOICES,null=True,blank=True)
     class Meta:
         db_table = 'eleves'
 
@@ -96,7 +100,7 @@ class InscriptionTemporaire(models.Model):
     # Champs spécifiques élève
     date_naissance = models.DateField(null=True, blank=True)
     tel_parent = models.CharField(max_length=20, blank=True, null=True)
- 
+    niveau = models.CharField(max_length=20,blank=True,null=True)
     # Champs spécifiques prof
     specialite = models.CharField(max_length=100, blank=True, null=True)
  

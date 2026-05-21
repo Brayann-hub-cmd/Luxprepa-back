@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import InscriptionSerializer, ConnexionSerializer
+from .serializers import RegisterSerializer, ConnexionSerializer
 from .models import User
 
 
@@ -51,7 +51,7 @@ class InscriptionView(APIView):
     """
 
     def post(self, request):
-        serializer = InscriptionSerializer(data=request.data)
+        serializer = RegisterSerializer(data=request.data)
 
         if not serializer.is_valid():
             return Response(
@@ -62,21 +62,13 @@ class InscriptionView(APIView):
         # create() retourne (user, code)
         user, code = serializer.save()
 
-        # TODO: Stocker le code en base (modèle CodeConfirmation) pour vérification
-        # Pour l'instant on le retourne dans la réponse (à retirer en production !)
         return Response(
             {
-                "message": "Inscription réussie. Un code de confirmation a été envoyé par SMS.",
+                "message": "Inscription réussie.",
                 "user_id": str(user.id),
-                "code_debug": code,  # ⚠️ À RETIRER EN PRODUCTION
             },
             status=status.HTTP_201_CREATED
         )
-
-
-# ───────────────────────────────────────────
-# CONNEXION
-# ───────────────────────────────────────────
 
 class ConnexionView(APIView):
     """
