@@ -297,6 +297,10 @@ class MatiereCoefficientInput(serializers.Serializer):
     matiere_id = serializers.UUIDField()
     coefficient = serializers.IntegerField(min_value=1)
 
+class MatiereSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Matiere
+        fields = ['id','nom','description']
 
 class ConcoursCreateSerializer(serializers.Serializer):
     nom = serializers.CharField(max_length=200)

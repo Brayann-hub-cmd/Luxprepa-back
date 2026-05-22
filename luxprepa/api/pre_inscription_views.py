@@ -88,11 +88,6 @@ class PreInscriptionSerializer(serializers.Serializer):
 
         return temp
 
-
-# ───────────────────────────────────────────
-# SERIALIZER ÉTAPE 2 — Confirmation du code
-# ───────────────────────────────────────────
-
 class ConfirmationSMSSerializer(serializers.Serializer):
     telephone = serializers.CharField(max_length=20)
     code = serializers.CharField(max_length=6, min_length=6)
@@ -177,22 +172,6 @@ class ConfirmationSMSSerializer(serializers.Serializer):
 # ───────────────────────────────────────────
 
 class PreInscriptionView(APIView):
-    """
-    POST /api/auth/pre-inscription/
-    Enregistre temporairement les données et envoie un code SMS.
-
-    Corps :
-    {
-        "nom": "Kamga",
-        "prenom": "Brayann",
-        "telephone": "690000000",
-        "password": "monpassword",
-        "role": "eleve",
-        "date_naissance": "2000-01-01",
-        "tel_parent": "670000000"
-    }
-    """
-
     def post(self, request):
         serializer = PreInscriptionSerializer(data=request.data)
 
@@ -213,22 +192,7 @@ class PreInscriptionView(APIView):
             status=status.HTTP_200_OK
         )
 
-
-# ───────────────────────────────────────────
-# VUE ÉTAPE 2 — Confirmation SMS
-# ───────────────────────────────────────────
-
 class ConfirmationSMSView(APIView):
-    """
-    POST /api/auth/confirmer/
-    Vérifie le code SMS et crée le compte définitivement.
-
-    Corps :
-    {
-        "telephone": "690000000",
-        "code": "123456"
-    }
-    """
 
     def post(self, request):
         serializer = ConfirmationSMSSerializer(data=request.data)
@@ -255,11 +219,6 @@ class ConfirmationSMSView(APIView):
             },
             status=status.HTTP_201_CREATED
         )
-
-
-# ───────────────────────────────────────────
-# VUE — Renvoyer le code SMS
-# ───────────────────────────────────────────
 
 class RenvoyerCodeView(APIView):
     """
