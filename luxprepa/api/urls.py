@@ -34,7 +34,7 @@ urlpatterns = [
     path('auth/nouveau-password/', NouveauMotDePasseView.as_view()),
 
     path('matieres/',MatiereListView.as_view(),name='matiere-list'),
-    path('matieres/<uuid:id_matiere>',MatiereDetailView.as_view(),name='matiere-detail'),
+    path('matieres/<uuid:id_matiere>/',MatiereDetailView.as_view(),name='matiere-detail'),
 
     # ── Concours ──
     path('concours/', ConcoursListView.as_view(), name='concours-list'),

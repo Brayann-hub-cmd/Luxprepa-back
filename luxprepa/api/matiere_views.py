@@ -41,6 +41,7 @@ class MatiereDetailView(APIView):
         serializer = MatiereSerializer(matiere,data=request.data,partial=True)
         if not serializer.is_valid():
             return Response({"erreurs":serializer.errors},status=status.HTTP_400_BAD_REQUEST)
+        matiere = serializer.save()
         return Response(
             {"message":"Matiere modifiée avec succès","matiere":MatiereSerializer(matiere).data},
             status=status.HTTP_200_OK
