@@ -149,5 +149,5 @@ SIMPLE_JWT = {
 }
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR,'media')
+MEDIA_ROOT = os.path.join(BASE_DIR,'uploads')
 SMS_MODE = env('SMS_MODE',default='dev')

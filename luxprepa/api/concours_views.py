@@ -146,10 +146,6 @@ class ConcoursDetailView(APIView):
 # ───────────────────────────────────────────
 
 class InscriptionListView(APIView):
-    """
-    GET  /api/inscriptions/     → liste des inscriptions de l'élève connecté
-    POST /api/inscriptions/     → s'inscrire à un concours
-    """
 
     def get(self, request):
         user = get_user_from_token(request)
@@ -216,12 +212,6 @@ class InscriptionListView(APIView):
 
 
 class InscriptionDetailView(APIView):
-    """
-    GET    /api/inscriptions/<id>/              → détails d'une inscription
-    PATCH  /api/inscriptions/<id>/valider/      → valider une inscription (admin)
-    DELETE /api/inscriptions/<id>/              → annuler une inscription
-    """
-
     def get(self, request, inscription_id):
         user = get_user_from_token(request)
         if user is None:
@@ -262,9 +252,6 @@ class InscriptionDetailView(APIView):
 
 
 class ValiderInscriptionView(APIView):
-    """
-    PATCH /api/inscriptions/<id>/valider/   → valider une inscription (admin only)
-    """
 
     def patch(self, request, inscription_id):
         user = get_user_from_token(request)
@@ -284,17 +271,8 @@ class ValiderInscriptionView(APIView):
             status=status.HTTP_200_OK
         )
 
-
-# ───────────────────────────────────────────
-# PAIEMENT
-# ───────────────────────────────────────────
-
 class PaiementListView(APIView):
-    """
-    GET  /api/paiements/    → liste des paiements de l'élève connecté
-    POST /api/paiements/    → effectuer un versement
-    """
-
+ 
     def get(self, request):
         user = get_user_from_token(request)
         if user is None:
@@ -314,9 +292,9 @@ class PaiementListView(APIView):
         user = get_user_from_token(request)
         if user is None:
             return reponse_non_autorise()
-        if user.role != 'eleve':
+        if user.role != 'admin':
             return Response(
-                {"erreur": "Seuls les élèves peuvent effectuer des paiements."},
+                {"erreur": "Seuls les administrateurs peuvent effectuer des paiements."},
                 status=status.HTTP_403_FORBIDDEN
             )
 

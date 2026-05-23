@@ -281,6 +281,7 @@ class Annonce(models.Model):
     contenu = models.TextField()
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='info')
     is_public = models.BooleanField(default=True)
+    image = models.ImageField(upload_to='annonces/',null=True,blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -121,13 +121,11 @@ class RegisterSerializer(serializers.Serializer):
     specialite = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
     def validate_telephone(self, value):
-        """Vérifie que le numéro n'est pas déjà utilisé"""
         if User.objects.filter(telephone=value).exists():
             raise serializers.ValidationError("Ce numéro de téléphone est déjà utilisé.")
         return value
 
     def validate(self, data):
-        """Vérifie les champs obligatoires selon le rôle"""
         role = data.get('role')
         if role == 'prof' and not data.get('specialite'):
             raise serializers.ValidationError({
@@ -173,11 +171,6 @@ class RegisterSerializer(serializers.Serializer):
         # Retourner le user et le code (le code sera stocké côté vue)
         return user, code
 
-
-# ───────────────────────────────────────────
-# CONNEXION
-# ───────────────────────────────────────────
-
 class ConnexionSerializer(serializers.Serializer):
     telephone = serializers.CharField(max_length=20)
     password = serializers.CharField(write_only=True)
@@ -214,27 +207,32 @@ class ConnexionSerializer(serializers.Serializer):
             }
         }
 
-# ───────────────────────────────────────────
-# MATIERE
-# ───────────────────────────────────────────
-
 class MatiereSerializer(serializers.ModelSerializer):
     class Meta:
         model = Matiere
         fields = ['id', 'nom', 'description']
 
 
-# ───────────────────────────────────────────
-# MATIERE CONCOURS (avec coefficient)
-# ───────────────────────────────────────────
-
 class MatiereConcourSerializer(serializers.ModelSerializer):
-    matiere = MatiereSerializer(read_only=True)
-    matiere_id = serializers.UUIDField(write_only=True)
-
+    matiere_nom = serializers.SerializerMethodField()
+    concours_nom = serializers.SerializerMethodField()
     class Meta:
         model = MatiereConcours
-        fields = ['id', 'matiere', 'matiere_id', 'coefficient']
+        fields = ['id', 'matiere','concours','coefficient','matiere_nom','concours_nom']
+    def get_matiere_nom(self,obj) -> str:
+        return obj.matiere.nom
+    def get_concours_nom(self,obj) -> str:
+        return obj.concours.nom
+    def validate(self, data):
+        if MatiereConcours.objects.filter(
+            matiere = data['matiere'],
+            concours = data['concours']
+        ).exists():
+            raise serializers.ValidationError(
+                "Cette matière est déja associée à ce concours."
+            )
+        return data
+    
 
 
 # ───────────────────────────────────────────
@@ -593,7 +591,6 @@ class NoteSerializer(serializers.ModelSerializer):
 
 
 class NoteUpdateSerializer(serializers.ModelSerializer):
-    """Serializer léger uniquement pour modifier la valeur d'une note"""
     class Meta:
         model = Note
         fields = ['valeur']
@@ -643,11 +640,6 @@ class SessionSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-
-# ───────────────────────────────────────────
-# ANNONCE
-# ───────────────────────────────────────────
-
 class AnnonceSerializer(serializers.ModelSerializer):
     admin_nom = serializers.SerializerMethodField()
     admin_id = serializers.UUIDField(write_only=True, required=False)
@@ -656,16 +648,24 @@ class AnnonceSerializer(serializers.ModelSerializer):
         model = Annonce
         fields = [
             'id', 'titre', 'contenu', 'type',
-            'is_public', 'created_at',
+            'is_public', 'created_at','image',
             'admin_id', 'admin_nom',
         ]
         read_only_fields = ['created_at']
-
+        extra_kwargs = {
+            'image':{'write_only':True}
+        }
     def get_admin_nom(self, obj) -> str:
         if obj.admin:
             return f"{obj.admin.prenom} {obj.admin.nom}"
         return "N/A"
-
+    def get_image_url(self,obj) -> str | None:
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
     def create(self, validated_data):
         # L'admin est injecté depuis la vue
         admin = self.context.get('admin')
