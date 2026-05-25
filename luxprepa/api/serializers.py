@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from rest_framework import serializers
-from .models import User, Eleve, Admin, Prof, Concours, Matiere, MatiereConcours,Session, Inscription, Paiement, Eleve, Note,Annonce
+from .models import User, Eleve, Admin, Prof, Concours, Matiere, MatiereConcours,Session, Inscription, Paiement, Eleve, Note,Annonce,Activite
 from django.db.models import Sum
 def generer_code_sms():
     return str(random.randint(100000, 999999))
@@ -678,3 +678,32 @@ class AnnonceSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+class ActiviteSerializer(serializers.ModelSerializer):
+    temps = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Activite
+        fields = ['id', 'type', 'message', 'created_at', 'temps']
+
+    def get_temps(self, obj) -> str:
+        from django.utils import timezone
+        diff = timezone.now() - obj.created_at
+        if diff.seconds < 60:
+            return "À l'instant"
+        if diff.seconds < 3600:
+            return f"{diff.seconds // 60} min"
+        if diff.days == 0:
+            return f"{diff.seconds // 3600} h"
+        if diff.days == 1:
+            return "Hier"
+        return f"{diff.days} j"
+
+class EleveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Eleve
+        fields = [
+            'id', 'nom', 'prenom', 'telephone',
+            'niveau', 'date_naissance', 'tel_parent',
+            'role', 'created_at'
+        ]

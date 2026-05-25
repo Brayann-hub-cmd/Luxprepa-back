@@ -308,3 +308,24 @@ class Note(models.Model):
 
     class Meta:
         db_table = 'notes'
+
+class Activite(models.Model):
+    TYPE_CHOICES = [
+        ('inscription','Inscription'),
+        ('paiement','Paiement'),
+        ('note','Note'),
+        ('annonce','Annonce'),
+        ('compte','Compte')
+    ]
+
+    id = models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    type_act = models.CharField(max_length=20,choices=TYPE_CHOICES)
+    message = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'activites'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.type} - {self.message}'

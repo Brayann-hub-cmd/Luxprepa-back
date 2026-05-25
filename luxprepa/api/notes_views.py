@@ -8,11 +8,6 @@ from rest_framework import status
 from .models import Note, Session, Annonce, User, Eleve, Prof, Admin, Inscription, Paiement
 from .serializers import NoteSerializer, NoteUpdateSerializer, SessionSerializer, AnnonceSerializer
 
-
-# ───────────────────────────────────────────
-# UTILITAIRES
-# ───────────────────────────────────────────
-
 def verifier_token(request):
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):

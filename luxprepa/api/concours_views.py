@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Concours, Inscription, Paiement, Eleve, User
+from .models import Concours, Inscription, Paiement, Eleve, User,Activite
 from .serializers import (
     ConcoursListSerializer, ConcoursDetailSerializer, ConcoursCreateSerializer,
     InscriptionSerializer, PaiementSerializer, SessionSerializer
@@ -45,17 +45,7 @@ def reponse_admin_requis():
         status=status.HTTP_403_FORBIDDEN
     )
 
-
-# ───────────────────────────────────────────
-# CONCOURS
-# ───────────────────────────────────────────
-
 class ConcoursListView(APIView):
-    """
-    GET  /api/concours/         → liste tous les concours (public)
-    POST /api/concours/         → créer un concours (admin only)
-    """
-
     def get(self, request):
         concours = Concours.objects.all().order_by('date_debut')
         serializer = ConcoursListSerializer(concours, many=True)
@@ -87,11 +77,6 @@ class ConcoursListView(APIView):
 
 
 class ConcoursDetailView(APIView):
-    """
-    GET    /api/concours/<id>/   → détails d'un concours (public)
-    PUT    /api/concours/<id>/   → modifier un concours (admin only)
-    DELETE /api/concours/<id>/   → supprimer un concours (admin only)
-    """
 
     def get(self, request, concours_id):
         concours = get_object_or_404(Concours, id=concours_id)
@@ -139,11 +124,6 @@ class ConcoursDetailView(APIView):
             {"message": "Concours supprimé avec succès."},
             status=status.HTTP_200_OK
         )
-
-
-# ───────────────────────────────────────────
-# INSCRIPTION À UN CONCOURS
-# ───────────────────────────────────────────
 
 class InscriptionListView(APIView):
 
@@ -263,6 +243,11 @@ class ValiderInscriptionView(APIView):
         inscription = get_object_or_404(Inscription, id=inscription_id)
         inscription.status = 'validee'
         inscription.save()
+        Activite.objects.create(
+            type_act='inscription',
+            message = f"Inscription de {inscription.eleve.prenom} {inscription.eleve.nom} confirmée - {inscription.concours.nom}"
+        )
+
         return Response(
             {
                 "message": "Inscription validée avec succès.",

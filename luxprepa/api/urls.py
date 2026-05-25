@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     # Auth
-    InscriptionView, ConnexionView, ProfilView, DeconnexionView,
+    InscriptionView, ConnexionView, ProfilView, DeconnexionView,EleveListView
 )
 from .concours_views import (
     ConcoursListView, ConcoursDetailView,
@@ -17,6 +17,7 @@ from .pre_inscription_views import (PreInscriptionView,ConfirmationSMSView,Renvo
 from .pwd_views import (ChangerMotDePasseView,MotDePasseOublieView,VerifierCodeResetView,NouveauMotDePasseView)
 from .matiere_views import MatiereDetailView,MatiereListView
 from .matiere_concours_views import MatiereConcourDetailView,MatiereConcourListView
+from .activite_views import ActiviteListView
 urlpatterns = [
     # ── Auth ──
     path('auth/inscription/', InscriptionView.as_view(), name='inscription'),
@@ -56,4 +57,7 @@ urlpatterns = [
     # ── Annonces ──
     path('annonces/', AnnonceListView.as_view(), name='annonce-list'),
     path('annonces/<uuid:annonce_id>/', AnnonceDetailView.as_view(), name='annonce-detail'),
+    
+    path('activites/', ActiviteListView.as_view(), name='activite-list'),
+    path('eleves/', EleveListView.as_view(), name='eleve-list'),
 ]
