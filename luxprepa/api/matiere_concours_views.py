@@ -1,9 +1,20 @@
 from rest_framework.response import Response
+from rest_framework.generics import ListAPIView
 from rest_framework import status
 from .models import User, MatiereConcours
 from .serializers import MatiereConcourSerializer
 from .concours_views import get_user_from_token,get_object_or_404,reponse_non_autorise,reponse_admin_requis
 from rest_framework.views import APIView
+
+class MatiereConcoursListView(ListAPIView):
+    serializer_class = MatiereConcourSerializer
+
+    def get_queryset(self):
+        queryset = MatiereConcours.objects.all().select_related('matiere')
+        concours_id = self.request.query_params.get('concours')
+        if concours_id:
+            queryset = queryset.filter(concours_id=concours_id)
+        return queryset
 
 class MatiereConcourListView(APIView):
     def get(self,request):

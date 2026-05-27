@@ -21,6 +21,7 @@ class User(models.Model):
 
     class Meta:
         db_table = 'users'
+        ordering = ['-nom']
 
     def __str__(self):
         return f"{self.prenom} {self.nom}"
@@ -130,6 +131,7 @@ class Matiere(models.Model):
 
     class Meta:
         db_table = 'matieres'
+        ordering = ['-nom']
 
     def __str__(self):
         return self.nom
@@ -151,6 +153,7 @@ class Concours(models.Model):
 
     class Meta:
         db_table = 'concours'
+        ordering = ['-nom']
 
     def __str__(self):
         return self.nom
@@ -286,6 +289,7 @@ class Annonce(models.Model):
 
     class Meta:
         db_table = 'annonces'
+        ordering = ['-created_at']
 
     def __str__(self):
         return self.titre
@@ -307,6 +311,7 @@ class Note(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        unique_together = ('eleve', 'session', 'matiere_concours')
         db_table = 'notes'
 
 class Activite(models.Model):

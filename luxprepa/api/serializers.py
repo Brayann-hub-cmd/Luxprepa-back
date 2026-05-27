@@ -163,12 +163,8 @@ class RegisterSerializer(serializers.Serializer):
         # Générer et envoyer le code SMS
         code = generer_code_sms()
 
-        # Stocker le code temporairement dans un champ ou cache
-        # Pour l'instant on l'envoie directement par SMS
         message = f"Bienvenue sur LuxPrepa ! Votre code de confirmation est : {code}"
         envoyer_sms(user.telephone, message)
-
-        # Retourner le user et le code (le code sera stocké côté vue)
         return user, code
 
 class ConnexionSerializer(serializers.Serializer):
@@ -232,12 +228,6 @@ class MatiereConcourSerializer(serializers.ModelSerializer):
                 "Cette matière est déja associée à ce concours."
             )
         return data
-    
-
-
-# ───────────────────────────────────────────
-# CONCOURS - LECTURE
-# ───────────────────────────────────────────
 
 class ConcoursListSerializer(serializers.ModelSerializer):
     nombre_matieres = serializers.SerializerMethodField()
@@ -369,33 +359,28 @@ class ConcoursCreateSerializer(serializers.Serializer):
 
         return instance
 
-
-# ───────────────────────────────────────────
-# SESSION
-# ───────────────────────────────────────────
-
 class SessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Session
         fields = ['id', 'nom', 'date', 'concours']
 
 
-# ───────────────────────────────────────────
-# INSCRIPTION
-# ───────────────────────────────────────────
-
 class InscriptionSerializer(serializers.ModelSerializer):
     concours = ConcoursListSerializer(read_only=True)
     concours_id = serializers.UUIDField(write_only=True)
     total_paye = serializers.SerializerMethodField()
     reste_a_payer = serializers.SerializerMethodField()
-
+    eleve_id = serializers.UUIDField(source='eleve.id', read_only=True)
+    eleve_nom = serializers.SerializerMethodField()
+    eleve_telephone = serializers.CharField(source='eleve.telephone', read_only=True)
+    eleve_niveau = serializers.CharField(source='eleve.niveau', read_only=True, default=None)
     class Meta:
         model = Inscription
         fields = [
             'id', 'concours', 'concours_id',
             'status', 'created_at',
             'total_paye', 'reste_a_payer',
+            'eleve_id', 'eleve_nom','eleve_telephone', 'eleve_niveau',
         ]
         read_only_fields = ['status', 'created_at']
 
@@ -412,6 +397,9 @@ class InscriptionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ce concours n'existe pas.")
         return value
 
+    def get_eleve_nom(self, obj) -> str:
+        return f"{obj.eleve.prenom} {obj.eleve.nom}"
+    
     def create(self, validated_data):
         eleve = self.context['request'].user_obj 
         concours_id = validated_data['concours_id']
@@ -425,9 +413,6 @@ class InscriptionSerializer(serializers.ModelSerializer):
             concours_id=concours_id,
             status='en_attente',
         )
-# ───────────────────────────────────────────
-# PAIEMENT
-# ───────────────────────────────────────────
 
 class PaiementSerializer(serializers.ModelSerializer):
     inscription_id = serializers.UUIDField(write_only=True)
@@ -534,11 +519,6 @@ class NoteSerializer(serializers.ModelSerializer):
     def get_session_nom(self, obj) -> str:
         return obj.session.nom
 
-    # def validate_valeur(self, value):
-    #     if value < 0 or value > 20:
-    #         raise serializers.ValidationError("La note doit être entre 0 et 20.")
-    #     return value
-
     def validate(self, data):
         # Vérifier que l'élève existe
         try:
@@ -599,11 +579,6 @@ class NoteUpdateSerializer(serializers.ModelSerializer):
     #     if value < 0 or value > 20:
     #         raise serializers.ValidationError("La note doit être entre 0 et 20.")
     #     return value
-
-
-# ───────────────────────────────────────────
-# SESSION
-# ───────────────────────────────────────────
 
 class SessionSerializer(serializers.ModelSerializer):
     concours_nom = serializers.SerializerMethodField()

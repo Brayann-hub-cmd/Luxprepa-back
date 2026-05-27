@@ -132,9 +132,9 @@ class InscriptionListView(APIView):
         if user is None:
             return reponse_non_autorise()
 
-        # Admin voit toutes les inscriptions, élève voit les siennes
-        if user.role == 'admin':
-            inscriptions = Inscription.objects.all().select_related('concours', 'eleve')
+        # Base queryset
+        if user.role == 'admin' or user.role == 'prof':
+            queryset = Inscription.objects.all().select_related('concours', 'eleve')
         else:
             try:
                 eleve = Eleve.objects.get(id=user.id)
@@ -143,10 +143,16 @@ class InscriptionListView(APIView):
                     {"erreur": "Profil élève introuvable."},
                     status=status.HTTP_404_NOT_FOUND
                 )
-            inscriptions = Inscription.objects.filter(eleve=eleve).select_related('concours')
+            queryset = Inscription.objects.filter(eleve=eleve).select_related('concours')
 
-        serializer = InscriptionSerializer(inscriptions, many=True)
+        # Filtre optionnel par concours
+        concours_id = request.query_params.get('concours')  # ou 'concours_id' selon votre convention
+        if concours_id:
+            queryset = queryset.filter(concours_id=concours_id)
+
+        serializer = InscriptionSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
     def post(self, request):
         user = get_user_from_token(request)

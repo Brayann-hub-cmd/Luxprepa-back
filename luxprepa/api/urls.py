@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     # Auth
-    InscriptionView, ConnexionView, ProfilView, DeconnexionView,EleveListView
+    InscriptionView, ConnexionView, ProfilView, DeconnexionView,EleveListView,EleveDetailView
 )
 from .concours_views import (
     ConcoursListView, ConcoursDetailView,
@@ -11,12 +11,12 @@ from .concours_views import (
 from .notes_views import (
     NoteListView, NoteDetailView,
     SessionListView, SessionDetailView,
-    AnnonceListView, AnnonceDetailView,
+    AnnonceListView, AnnonceDetailView,NoteBatchCreateView
 )
 from .pre_inscription_views import (PreInscriptionView,ConfirmationSMSView,RenvoyerCodeView)
 from .pwd_views import (ChangerMotDePasseView,MotDePasseOublieView,VerifierCodeResetView,NouveauMotDePasseView)
 from .matiere_views import MatiereDetailView,MatiereListView
-from .matiere_concours_views import MatiereConcourDetailView,MatiereConcourListView
+from .matiere_concours_views import MatiereConcourDetailView,MatiereConcourListView,MatiereConcoursListView
 from .activite_views import ActiviteListView
 urlpatterns = [
     # ── Auth ──
@@ -37,8 +37,9 @@ urlpatterns = [
     path('matieres/',MatiereListView.as_view(),name='matiere-list'),
     path('matieres/<uuid:id_matiere>/',MatiereDetailView.as_view(),name='matiere-detail'),
     # ── Matiere Concours ──
-    path('matieres-concours/',MatiereConcourListView.as_view(),name='matiere-concours-list'),
-    path('matieres-concours/<uuid:id_mc>/',MatiereConcourDetailView.as_view(),name='matiere-concours-detail'),
+    path('matiere-concours/',MatiereConcourListView.as_view(),name='matiere-concours-list'),
+    path('matiere-concours/<uuid:id_mc>/',MatiereConcourDetailView.as_view(),name='matiere-concours-detail'),
+    path('matieres-concours/', MatiereConcoursListView.as_view()),
     # ── Concours ──
     path('concours/', ConcoursListView.as_view(), name='concours-list'),
     path('concours/<uuid:concours_id>/', ConcoursDetailView.as_view(), name='concours-detail'),
@@ -54,10 +55,12 @@ urlpatterns = [
     # ── notes ──
     path('notes/', NoteListView.as_view(), name='note-list'),
     path('notes/<uuid:note_id>/', NoteDetailView.as_view(), name='note-detail'),
+    path('/notes/batch/',NoteBatchCreateView.as_view(),name='notes'),
     # ── Annonces ──
     path('annonces/', AnnonceListView.as_view(), name='annonce-list'),
     path('annonces/<uuid:annonce_id>/', AnnonceDetailView.as_view(), name='annonce-detail'),
     
     path('activites/', ActiviteListView.as_view(), name='activite-list'),
     path('eleves/', EleveListView.as_view(), name='eleve-list'),
+    path('eleves/<uuid:id_eleve>/', EleveDetailView.as_view(), name='eleve-detail'),
 ]

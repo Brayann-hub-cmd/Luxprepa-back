@@ -60,16 +60,27 @@ class NoteListView(APIView):
         if user is None:
             return reponse_non_autorise()
 
+        # Base queryset avec select_related
         if user.role == 'eleve':
-            notes = Note.objects.filter(eleve__id=user.id).select_related(
+            queryset = Note.objects.filter(eleve__id=user.id).select_related(
                 'eleve', 'prof', 'session', 'matiere_concours__matiere'
             )
         else:
-            notes = Note.objects.all().select_related(
+            queryset = Note.objects.all().select_related(
                 'eleve', 'prof', 'session', 'matiere_concours__matiere'
             )
 
-        serializer = NoteSerializer(notes, many=True)
+        # Filtres optionnels par paramètres GET
+        session_id = request.query_params.get('session')
+        matiere_concours_id = request.query_params.get('matiere_concours')
+
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+        if matiere_concours_id:
+            # Note : `matiere_concours_id` est le nom du champ ForeignKey
+            queryset = queryset.filter(matiere_concours_id=matiere_concours_id)
+
+        serializer = NoteSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
@@ -363,3 +374,11 @@ class AnnonceDetailView(APIView):
             {"message": "Annonce supprimée avec succès."},
             status=status.HTTP_200_OK
         )
+    
+class NoteBatchCreateView(APIView):
+    def post(self, request):
+        serializer = NoteSerializer(data=request.data, many=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
