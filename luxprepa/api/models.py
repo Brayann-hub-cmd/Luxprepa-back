@@ -21,6 +21,7 @@ class User(models.Model):
 
     class Meta:
         db_table = 'users'
+        ordering = ['-nom']
 
     def __str__(self):
         return f"{self.prenom} {self.nom}"
@@ -130,6 +131,7 @@ class Matiere(models.Model):
 
     class Meta:
         db_table = 'matieres'
+        ordering = ['-nom']
 
     def __str__(self):
         return self.nom
@@ -151,6 +153,7 @@ class Concours(models.Model):
 
     class Meta:
         db_table = 'concours'
+        ordering = ['-nom']
 
     def __str__(self):
         return self.nom
@@ -281,10 +284,12 @@ class Annonce(models.Model):
     contenu = models.TextField()
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='info')
     is_public = models.BooleanField(default=True)
+    image = models.ImageField(upload_to='annonces/',null=True,blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'annonces'
+        ordering = ['-created_at']
 
     def __str__(self):
         return self.titre
@@ -306,4 +311,45 @@ class Note(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        unique_together = ('eleve', 'session', 'matiere_concours')
         db_table = 'notes'
+
+class Activite(models.Model):
+    TYPE_CHOICES = [
+        ('inscription','Inscription'),
+        ('paiement','Paiement'),
+        ('note','Note'),
+        ('annonce','Annonce'),
+        ('compte','Compte')
+    ]
+
+    id = models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    type_act = models.CharField(max_length=20,choices=TYPE_CHOICES)
+    message = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'activites'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.type} - {self.message}'
+    
+class LienResultat(models.Model):
+    token = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    eleve = models.ForeignKey(Eleve, on_delete=models.CASCADE, related_name='liens_resultats')
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='liens_resultats')
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_expiration = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('eleve', 'session')
+        db_table = 'liens_resultats'
+
+    def est_valide(self):
+        if self.date_expiration and timezone.now() > self.date_expiration:
+            return False
+        return True
+
+    def __str__(self):
+        return f"Lien {self.eleve} - {self.session}"

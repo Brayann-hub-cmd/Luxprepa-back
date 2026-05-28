@@ -60,6 +60,7 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:5174"
 ]
 
 CORS_EXPOSE_HEADERS = ['*']
@@ -149,5 +150,5 @@ SIMPLE_JWT = {
 }
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR,'media')
+MEDIA_ROOT = os.path.join(BASE_DIR,'uploads')
 SMS_MODE = env('SMS_MODE',default='dev')

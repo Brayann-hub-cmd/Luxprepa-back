@@ -38,7 +38,7 @@ class PreInscriptionSerializer(serializers.Serializer):
     date_naissance = serializers.DateField(required=False, allow_null=True)
     tel_parent = serializers.CharField(max_length=20, required=False, allow_blank=True)
     niveau = serializers.ChoiceField(
-        choices=['tle','post_bac'],
+        choices=['tle','post_bac'],required=False,allow_null=True
     )
     # Champs spécifiques prof
     specialite = serializers.CharField(max_length=100, required=False, allow_blank=True)
@@ -76,7 +76,7 @@ class PreInscriptionSerializer(serializers.Serializer):
             role=data['role'],
             date_naissance=data.get('date_naissance'),
             tel_parent=data.get('tel_parent', ''),
-            niveau=data.get("niveau"),
+            niveau=data.get('niveau'),
             specialite=data.get('specialite', ''),
             code_sms=code,
             code_expire_at=timezone.now() + timedelta(minutes=10),

@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Concours, Inscription, Paiement, Eleve, User
+from .models import Concours, Inscription, Paiement, Eleve, User,Activite
 from .serializers import (
     ConcoursListSerializer, ConcoursDetailSerializer, ConcoursCreateSerializer,
     InscriptionSerializer, PaiementSerializer, SessionSerializer
@@ -45,17 +45,7 @@ def reponse_admin_requis():
         status=status.HTTP_403_FORBIDDEN
     )
 
-
-# ───────────────────────────────────────────
-# CONCOURS
-# ───────────────────────────────────────────
-
 class ConcoursListView(APIView):
-    """
-    GET  /api/concours/         → liste tous les concours (public)
-    POST /api/concours/         → créer un concours (admin only)
-    """
-
     def get(self, request):
         concours = Concours.objects.all().order_by('date_debut')
         serializer = ConcoursListSerializer(concours, many=True)
@@ -87,11 +77,6 @@ class ConcoursListView(APIView):
 
 
 class ConcoursDetailView(APIView):
-    """
-    GET    /api/concours/<id>/   → détails d'un concours (public)
-    PUT    /api/concours/<id>/   → modifier un concours (admin only)
-    DELETE /api/concours/<id>/   → supprimer un concours (admin only)
-    """
 
     def get(self, request, concours_id):
         concours = get_object_or_404(Concours, id=concours_id)
@@ -140,25 +125,16 @@ class ConcoursDetailView(APIView):
             status=status.HTTP_200_OK
         )
 
-
-# ───────────────────────────────────────────
-# INSCRIPTION À UN CONCOURS
-# ───────────────────────────────────────────
-
 class InscriptionListView(APIView):
-    """
-    GET  /api/inscriptions/     → liste des inscriptions de l'élève connecté
-    POST /api/inscriptions/     → s'inscrire à un concours
-    """
 
     def get(self, request):
         user = get_user_from_token(request)
         if user is None:
             return reponse_non_autorise()
 
-        # Admin voit toutes les inscriptions, élève voit les siennes
-        if user.role == 'admin':
-            inscriptions = Inscription.objects.all().select_related('concours', 'eleve')
+        # Base queryset
+        if user.role == 'admin' or user.role == 'prof':
+            queryset = Inscription.objects.all().select_related('concours', 'eleve')
         else:
             try:
                 eleve = Eleve.objects.get(id=user.id)
@@ -167,10 +143,16 @@ class InscriptionListView(APIView):
                     {"erreur": "Profil élève introuvable."},
                     status=status.HTTP_404_NOT_FOUND
                 )
-            inscriptions = Inscription.objects.filter(eleve=eleve).select_related('concours')
+            queryset = Inscription.objects.filter(eleve=eleve).select_related('concours')
 
-        serializer = InscriptionSerializer(inscriptions, many=True)
+        # Filtre optionnel par concours
+        concours_id = request.query_params.get('concours')  # ou 'concours_id' selon votre convention
+        if concours_id:
+            queryset = queryset.filter(concours_id=concours_id)
+
+        serializer = InscriptionSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
     def post(self, request):
         user = get_user_from_token(request)
@@ -216,12 +198,6 @@ class InscriptionListView(APIView):
 
 
 class InscriptionDetailView(APIView):
-    """
-    GET    /api/inscriptions/<id>/              → détails d'une inscription
-    PATCH  /api/inscriptions/<id>/valider/      → valider une inscription (admin)
-    DELETE /api/inscriptions/<id>/              → annuler une inscription
-    """
-
     def get(self, request, inscription_id):
         user = get_user_from_token(request)
         if user is None:
@@ -262,9 +238,6 @@ class InscriptionDetailView(APIView):
 
 
 class ValiderInscriptionView(APIView):
-    """
-    PATCH /api/inscriptions/<id>/valider/   → valider une inscription (admin only)
-    """
 
     def patch(self, request, inscription_id):
         user = get_user_from_token(request)
@@ -276,6 +249,11 @@ class ValiderInscriptionView(APIView):
         inscription = get_object_or_404(Inscription, id=inscription_id)
         inscription.status = 'validee'
         inscription.save()
+        Activite.objects.create(
+            type_act='inscription',
+            message = f"Inscription de {inscription.eleve.prenom} {inscription.eleve.nom} confirmée - {inscription.concours.nom}"
+        )
+
         return Response(
             {
                 "message": "Inscription validée avec succès.",
@@ -284,17 +262,8 @@ class ValiderInscriptionView(APIView):
             status=status.HTTP_200_OK
         )
 
-
-# ───────────────────────────────────────────
-# PAIEMENT
-# ───────────────────────────────────────────
-
 class PaiementListView(APIView):
-    """
-    GET  /api/paiements/    → liste des paiements de l'élève connecté
-    POST /api/paiements/    → effectuer un versement
-    """
-
+ 
     def get(self, request):
         user = get_user_from_token(request)
         if user is None:
@@ -314,9 +283,9 @@ class PaiementListView(APIView):
         user = get_user_from_token(request)
         if user is None:
             return reponse_non_autorise()
-        if user.role != 'eleve':
+        if user.role != 'admin':
             return Response(
-                {"erreur": "Seuls les élèves peuvent effectuer des paiements."},
+                {"erreur": "Seuls les administrateurs peuvent effectuer des paiements."},
                 status=status.HTTP_403_FORBIDDEN
             )
 

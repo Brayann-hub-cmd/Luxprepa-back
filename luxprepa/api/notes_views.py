@@ -8,11 +8,6 @@ from rest_framework import status
 from .models import Note, Session, Annonce, User, Eleve, Prof, Admin, Inscription, Paiement
 from .serializers import NoteSerializer, NoteUpdateSerializer, SessionSerializer, AnnonceSerializer
 
-
-# ───────────────────────────────────────────
-# UTILITAIRES
-# ───────────────────────────────────────────
-
 def verifier_token(request):
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
@@ -50,46 +45,42 @@ def reponse_acces_refuse():
 
 
 def eleve_a_tout_paye(eleve):
-    """
-    Vérifie si un élève a au moins une inscription totalement payée.
-    """
     inscriptions = Inscription.objects.filter(eleve=eleve, status='validee')
     for inscription in inscriptions:
         total_paye = inscription.paiements.aggregate(
             total=__import__('django.db.models', fromlist=['Sum']).Sum('montant')
         )['total'] or 0
-        if total_paye >= inscription.concours.montant_prepa:
+        if total_paye >= inscription.concours.montant_prepa + inscription.concours.inscription_prepa:
             return True
     return False
 
-
-# ───────────────────────────────────────────
-# NOTES
-# ───────────────────────────────────────────
-
 class NoteListView(APIView):
-    """
-    GET  /api/notes/    → liste des notes
-                          - Admin/Prof : toutes les notes
-                          - Élève : seulement ses notes
-    POST /api/notes/    → affecter une note (prof ou admin uniquement)
-    """
-
     def get(self, request):
         user = get_user_from_token(request)
         if user is None:
             return reponse_non_autorise()
 
+        # Base queryset avec select_related
         if user.role == 'eleve':
-            notes = Note.objects.filter(eleve__id=user.id).select_related(
+            queryset = Note.objects.filter(eleve__id=user.id).select_related(
                 'eleve', 'prof', 'session', 'matiere_concours__matiere'
             )
         else:
-            notes = Note.objects.all().select_related(
+            queryset = Note.objects.all().select_related(
                 'eleve', 'prof', 'session', 'matiere_concours__matiere'
             )
 
-        serializer = NoteSerializer(notes, many=True)
+        # Filtres optionnels par paramètres GET
+        session_id = request.query_params.get('session')
+        matiere_concours_id = request.query_params.get('matiere_concours')
+
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+        if matiere_concours_id:
+            # Note : `matiere_concours_id` est le nom du champ ForeignKey
+            queryset = queryset.filter(matiere_concours_id=matiere_concours_id)
+
+        serializer = NoteSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
@@ -119,12 +110,6 @@ class NoteListView(APIView):
 
 
 class NoteDetailView(APIView):
-    """
-    GET    /api/notes/<id>/     → détails d'une note
-    PATCH  /api/notes/<id>/     → modifier une note (prof ou admin)
-    DELETE /api/notes/<id>/     → supprimer une note (admin uniquement)
-    """
-
     def get(self, request, note_id):
         user = get_user_from_token(request)
         if user is None:
@@ -181,17 +166,7 @@ class NoteDetailView(APIView):
             {"message": "Note supprimée avec succès."},
             status=status.HTTP_200_OK
         )
-
-
-# ───────────────────────────────────────────
-# SESSIONS
-# ───────────────────────────────────────────
-
 class SessionListView(APIView):
-    """
-    GET  /api/sessions/     → liste toutes les sessions (connecté)
-    POST /api/sessions/     → créer une session (admin uniquement)
-    """
 
     def get(self, request):
         user = get_user_from_token(request)
@@ -227,11 +202,6 @@ class SessionListView(APIView):
 
 
 class SessionDetailView(APIView):
-    """
-    GET    /api/sessions/<id>/  → détails d'une session
-    PUT    /api/sessions/<id>/  → modifier une session (admin)
-    DELETE /api/sessions/<id>/  → supprimer une session (admin)
-    """
 
     def get(self, request, session_id):
         user = get_user_from_token(request)
@@ -280,20 +250,7 @@ class SessionDetailView(APIView):
             status=status.HTTP_200_OK
         )
 
-
-# ───────────────────────────────────────────
-# ANNONCES
-# ───────────────────────────────────────────
-
 class AnnonceListView(APIView):
-    """
-    GET  /api/annonces/     → liste des annonces selon les droits
-    POST /api/annonces/     → créer une annonce (admin uniquement)
-
-    Règles de visibilité :
-    - is_public=True  → tout le monde
-    - is_public=False → admin, prof, élève ayant tout payé
-    """
 
     def get(self, request):
         user = get_user_from_token(request)
@@ -342,7 +299,7 @@ class AnnonceListView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = AnnonceSerializer(data=request.data, context={'admin': admin})
+        serializer = AnnonceSerializer(data=request.data, context={'admin': admin,'request':request})
         if not serializer.is_valid():
             return Response(
                 {"erreurs": serializer.errors},
@@ -353,18 +310,13 @@ class AnnonceListView(APIView):
         return Response(
             {
                 "message": "Annonce créée avec succès.",
-                "annonce": AnnonceSerializer(annonce).data,
+                "annonce": AnnonceSerializer(annonce,context={'request':request}).data,
             },
             status=status.HTTP_201_CREATED
         )
 
 
 class AnnonceDetailView(APIView):
-    """
-    GET    /api/annonces/<id>/  → détails d'une annonce
-    PUT    /api/annonces/<id>/  → modifier une annonce (admin)
-    DELETE /api/annonces/<id>/  → supprimer une annonce (admin)
-    """
 
     def get(self, request, annonce_id):
         annonce = get_object_or_404(Annonce, id=annonce_id)
@@ -422,3 +374,11 @@ class AnnonceDetailView(APIView):
             {"message": "Annonce supprimée avec succès."},
             status=status.HTTP_200_OK
         )
+    
+class NoteBatchCreateView(APIView):
+    def post(self, request):
+        serializer = NoteSerializer(data=request.data, many=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)

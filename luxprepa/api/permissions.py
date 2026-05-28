@@ -40,3 +40,9 @@ class IsAdminRole(BasePermission):
         if user.role == "admin":
             return True
         return False
+
+class IsAdminOrProfReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        if request.method == 'GET':
+            return request.user.is_authenticated  # prof peut lire
+        return request.user.is_authenticated and request.user.role == 'admin'

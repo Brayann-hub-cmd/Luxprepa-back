@@ -4,10 +4,11 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import RegisterSerializer, ConnexionSerializer
+from .serializers import RegisterSerializer, ConnexionSerializer,EleveSerializer
 from .models import User,Eleve,Prof
 from .permissions import IsAdminRole
 from rest_framework.parsers import MultiPartParser,FormParser
+from .concours_views import get_user_from_token,reponse_non_autorise,reponse_admin_requis,get_object_or_404
 def verifier_token(request):
     
     auth_header = request.headers.get('Authorization')
@@ -26,6 +27,11 @@ class InscriptionView(APIView):
     permission_classes = [IsAdminRole]
     parser_classes = [MultiPartParser, FormParser]
     def post(self, request):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role != 'admin':
+            return reponse_admin_requis()
         serializer = RegisterSerializer(data=request.data)
 
         if not serializer.is_valid():
@@ -140,3 +146,39 @@ class DeconnexionView(APIView):
             {"message": "Déconnexion réussie."},
             status=status.HTTP_200_OK
         )
+
+class EleveListView(APIView):
+    def get(self, request):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role not in ('admin', 'prof'):
+            return reponse_admin_requis()
+
+        eleves = Eleve.objects.all().order_by('nom')
+        serializer = EleveSerializer(eleves, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class EleveDetailView(APIView):
+    def get(self, request, id_eleve):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role != 'admin':
+            return reponse_admin_requis()
+        
+        eleve = get_object_or_404(Eleve,id=id_eleve)
+        serializer = EleveSerializer(eleve)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class UsersListView(APIView):
+    def get(self, request):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role not in ('admin', 'prof'):
+            return reponse_admin_requis()
+
+        users = User.objects.all().order_by('nom')
+        serializer = EleveSerializer(users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)      

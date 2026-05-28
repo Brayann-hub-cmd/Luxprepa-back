@@ -5,11 +5,11 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from rest_framework import serializers
-from .models import User, Eleve, Admin, Prof, Concours, Matiere, MatiereConcours,Session, Inscription, Paiement, Eleve, Note,Annonce
+from .models import User, Eleve, Admin, Prof, Concours, Matiere, MatiereConcours,Session, Inscription, Paiement, Eleve, Note,Annonce,Activite
 from django.db.models import Sum
+
 def generer_code_sms():
     return str(random.randint(100000, 999999))
-
 
 def detecter_operateur(telephone):
     prefixes_orange = ('69', '655', '656', '657', '658', '659', '650' ,'651', '652', '653', '654')
@@ -27,7 +27,6 @@ def detecter_operateur(telephone):
         return 'mtn'
 
     return None  # Opérateur inconnu
-
 
 def envoyer_sms_orange(telephone, message):
     url = "https://api.orange.com/smsmessaging/v1/outbound/tel%3A%2B237{}/requests".format(
@@ -52,7 +51,6 @@ def envoyer_sms_orange(telephone, message):
     except Exception:
         return False
 
-
 def envoyer_sms_mtn(telephone, message):
     url = "https://api.mtn.com/v1/sms/messages"
     headers = {
@@ -70,9 +68,7 @@ def envoyer_sms_mtn(telephone, message):
     except Exception:
         return False
 
-
 def envoyer_sms(telephone, message):
-
     #Vu que les api sms orange et mtn sont payantes on test en mode dev d'abord
     if settings.SMS_MODE == 'dev':
         print("\n"+'='*40)
@@ -90,7 +86,6 @@ def envoyer_sms(telephone, message):
     else:
         return envoyer_sms_orange(telephone, message)
 
-
 def generer_token_jwt(user):
     payload = {
         "user_id": str(user.id),
@@ -100,11 +95,6 @@ def generer_token_jwt(user):
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
     return token
-
-
-# ───────────────────────────────────────────
-# INSCRIPTION
-# ───────────────────────────────────────────
 
 class RegisterSerializer(serializers.Serializer):
     nom = serializers.CharField(max_length=100)
@@ -116,18 +106,16 @@ class RegisterSerializer(serializers.Serializer):
     # Champs spécifiques à l'élève (optionnels)
     date_naissance = serializers.DateField(required=False, allow_null=True)
     tel_parent = serializers.CharField(max_length=20, required=False, allow_blank=True)
-
+    niveau = serializers.CharField(max_length=20)
     # Champs spécifiques au prof (optionnel)
     specialite = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
     def validate_telephone(self, value):
-        """Vérifie que le numéro n'est pas déjà utilisé"""
         if User.objects.filter(telephone=value).exists():
             raise serializers.ValidationError("Ce numéro de téléphone est déjà utilisé.")
         return value
 
     def validate(self, data):
-        """Vérifie les champs obligatoires selon le rôle"""
         role = data.get('role')
         if role == 'prof' and not data.get('specialite'):
             raise serializers.ValidationError({
@@ -153,6 +141,7 @@ class RegisterSerializer(serializers.Serializer):
                 **base_data,
                 date_naissance=validated_data.get("date_naissance"),
                 tel_parent=validated_data.get("tel_parent", ""),
+                niveau=validated_data.get("niveau","")
             )
         elif role == 'prof':
             user = Prof.objects.create(
@@ -165,18 +154,9 @@ class RegisterSerializer(serializers.Serializer):
         # Générer et envoyer le code SMS
         code = generer_code_sms()
 
-        # Stocker le code temporairement dans un champ ou cache
-        # Pour l'instant on l'envoie directement par SMS
         message = f"Bienvenue sur LuxPrepa ! Votre code de confirmation est : {code}"
         envoyer_sms(user.telephone, message)
-
-        # Retourner le user et le code (le code sera stocké côté vue)
         return user, code
-
-
-# ───────────────────────────────────────────
-# CONNEXION
-# ───────────────────────────────────────────
 
 class ConnexionSerializer(serializers.Serializer):
     telephone = serializers.CharField(max_length=20)
@@ -214,32 +194,31 @@ class ConnexionSerializer(serializers.Serializer):
             }
         }
 
-# ───────────────────────────────────────────
-# MATIERE
-# ───────────────────────────────────────────
-
 class MatiereSerializer(serializers.ModelSerializer):
     class Meta:
         model = Matiere
         fields = ['id', 'nom', 'description']
 
 
-# ───────────────────────────────────────────
-# MATIERE CONCOURS (avec coefficient)
-# ───────────────────────────────────────────
-
 class MatiereConcourSerializer(serializers.ModelSerializer):
-    matiere = MatiereSerializer(read_only=True)
-    matiere_id = serializers.UUIDField(write_only=True)
-
+    matiere_nom = serializers.SerializerMethodField()
+    concours_nom = serializers.SerializerMethodField()
     class Meta:
         model = MatiereConcours
-        fields = ['id', 'matiere', 'matiere_id', 'coefficient']
-
-
-# ───────────────────────────────────────────
-# CONCOURS - LECTURE
-# ───────────────────────────────────────────
+        fields = ['id', 'matiere','concours','coefficient','matiere_nom','concours_nom']
+    def get_matiere_nom(self,obj) -> str:
+        return obj.matiere.nom
+    def get_concours_nom(self,obj) -> str:
+        return obj.concours.nom
+    def validate(self, data):
+        if MatiereConcours.objects.filter(
+            matiere = data['matiere'],
+            concours = data['concours']
+        ).exists():
+            raise serializers.ValidationError(
+                "Cette matière est déja associée à ce concours."
+            )
+        return data
 
 class ConcoursListSerializer(serializers.ModelSerializer):
     nombre_matieres = serializers.SerializerMethodField()
@@ -371,33 +350,28 @@ class ConcoursCreateSerializer(serializers.Serializer):
 
         return instance
 
-
-# ───────────────────────────────────────────
-# SESSION
-# ───────────────────────────────────────────
-
 class SessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Session
         fields = ['id', 'nom', 'date', 'concours']
 
 
-# ───────────────────────────────────────────
-# INSCRIPTION
-# ───────────────────────────────────────────
-
 class InscriptionSerializer(serializers.ModelSerializer):
     concours = ConcoursListSerializer(read_only=True)
     concours_id = serializers.UUIDField(write_only=True)
     total_paye = serializers.SerializerMethodField()
     reste_a_payer = serializers.SerializerMethodField()
-
+    eleve_id = serializers.UUIDField(source='eleve.id', read_only=True)
+    eleve_nom = serializers.SerializerMethodField()
+    eleve_telephone = serializers.CharField(source='eleve.telephone', read_only=True)
+    eleve_niveau = serializers.CharField(source='eleve.niveau', read_only=True, default=None)
     class Meta:
         model = Inscription
         fields = [
             'id', 'concours', 'concours_id',
             'status', 'created_at',
             'total_paye', 'reste_a_payer',
+            'eleve_id', 'eleve_nom','eleve_telephone', 'eleve_niveau',
         ]
         read_only_fields = ['status', 'created_at']
 
@@ -414,6 +388,9 @@ class InscriptionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ce concours n'existe pas.")
         return value
 
+    def get_eleve_nom(self, obj) -> str:
+        return f"{obj.eleve.prenom} {obj.eleve.nom}"
+    
     def create(self, validated_data):
         eleve = self.context['request'].user_obj 
         concours_id = validated_data['concours_id']
@@ -427,9 +404,6 @@ class InscriptionSerializer(serializers.ModelSerializer):
             concours_id=concours_id,
             status='en_attente',
         )
-# ───────────────────────────────────────────
-# PAIEMENT
-# ───────────────────────────────────────────
 
 class PaiementSerializer(serializers.ModelSerializer):
     inscription_id = serializers.UUIDField(write_only=True)
@@ -536,11 +510,6 @@ class NoteSerializer(serializers.ModelSerializer):
     def get_session_nom(self, obj) -> str:
         return obj.session.nom
 
-    # def validate_valeur(self, value):
-    #     if value < 0 or value > 20:
-    #         raise serializers.ValidationError("La note doit être entre 0 et 20.")
-    #     return value
-
     def validate(self, data):
         # Vérifier que l'élève existe
         try:
@@ -593,20 +562,9 @@ class NoteSerializer(serializers.ModelSerializer):
 
 
 class NoteUpdateSerializer(serializers.ModelSerializer):
-    """Serializer léger uniquement pour modifier la valeur d'une note"""
     class Meta:
         model = Note
         fields = ['valeur']
-
-    # def validate_valeur(self, value):
-    #     if value < 0 or value > 20:
-    #         raise serializers.ValidationError("La note doit être entre 0 et 20.")
-    #     return value
-
-
-# ───────────────────────────────────────────
-# SESSION
-# ───────────────────────────────────────────
 
 class SessionSerializer(serializers.ModelSerializer):
     concours_nom = serializers.SerializerMethodField()
@@ -643,11 +601,6 @@ class SessionSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-
-# ───────────────────────────────────────────
-# ANNONCE
-# ───────────────────────────────────────────
-
 class AnnonceSerializer(serializers.ModelSerializer):
     admin_nom = serializers.SerializerMethodField()
     admin_id = serializers.UUIDField(write_only=True, required=False)
@@ -656,16 +609,24 @@ class AnnonceSerializer(serializers.ModelSerializer):
         model = Annonce
         fields = [
             'id', 'titre', 'contenu', 'type',
-            'is_public', 'created_at',
+            'is_public', 'created_at','image',
             'admin_id', 'admin_nom',
         ]
         read_only_fields = ['created_at']
-
+        extra_kwargs = {
+            'image':{'write_only':True}
+        }
     def get_admin_nom(self, obj) -> str:
         if obj.admin:
             return f"{obj.admin.prenom} {obj.admin.nom}"
         return "N/A"
-
+    def get_image_url(self,obj) -> str | None:
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
     def create(self, validated_data):
         # L'admin est injecté depuis la vue
         admin = self.context.get('admin')
@@ -678,3 +639,38 @@ class AnnonceSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+class ActiviteSerializer(serializers.ModelSerializer):
+    temps = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Activite
+        fields = ['id', 'type', 'message', 'created_at', 'temps']
+
+    def get_temps(self, obj) -> str:
+        from django.utils import timezone
+        diff = timezone.now() - obj.created_at
+        if diff.seconds < 60:
+            return "À l'instant"
+        if diff.seconds < 3600:
+            return f"{diff.seconds // 60} min"
+        if diff.days == 0:
+            return f"{diff.seconds // 3600} h"
+        if diff.days == 1:
+            return "Hier"
+        return f"{diff.days} j"
+
+class EleveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Eleve
+        fields = [
+            'id', 'nom', 'prenom', 'telephone',
+            'niveau', 'date_naissance', 'tel_parent',
+            'role', 'created_at'
+        ]
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = '__all__'
+        read_only_fields = ['id','created_at']
