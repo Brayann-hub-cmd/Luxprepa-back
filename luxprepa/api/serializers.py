@@ -7,9 +7,9 @@ from django.contrib.auth.hashers import check_password
 from rest_framework import serializers
 from .models import User, Eleve, Admin, Prof, Concours, Matiere, MatiereConcours,Session, Inscription, Paiement, Eleve, Note,Annonce,Activite
 from django.db.models import Sum
+
 def generer_code_sms():
     return str(random.randint(100000, 999999))
-
 
 def detecter_operateur(telephone):
     prefixes_orange = ('69', '655', '656', '657', '658', '659', '650' ,'651', '652', '653', '654')
@@ -27,7 +27,6 @@ def detecter_operateur(telephone):
         return 'mtn'
 
     return None  # Opérateur inconnu
-
 
 def envoyer_sms_orange(telephone, message):
     url = "https://api.orange.com/smsmessaging/v1/outbound/tel%3A%2B237{}/requests".format(
@@ -52,7 +51,6 @@ def envoyer_sms_orange(telephone, message):
     except Exception:
         return False
 
-
 def envoyer_sms_mtn(telephone, message):
     url = "https://api.mtn.com/v1/sms/messages"
     headers = {
@@ -70,9 +68,7 @@ def envoyer_sms_mtn(telephone, message):
     except Exception:
         return False
 
-
 def envoyer_sms(telephone, message):
-
     #Vu que les api sms orange et mtn sont payantes on test en mode dev d'abord
     if settings.SMS_MODE == 'dev':
         print("\n"+'='*40)
@@ -90,7 +86,6 @@ def envoyer_sms(telephone, message):
     else:
         return envoyer_sms_orange(telephone, message)
 
-
 def generer_token_jwt(user):
     payload = {
         "user_id": str(user.id),
@@ -100,11 +95,6 @@ def generer_token_jwt(user):
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
     return token
-
-
-# ───────────────────────────────────────────
-# INSCRIPTION
-# ───────────────────────────────────────────
 
 class RegisterSerializer(serializers.Serializer):
     nom = serializers.CharField(max_length=100)
@@ -116,7 +106,7 @@ class RegisterSerializer(serializers.Serializer):
     # Champs spécifiques à l'élève (optionnels)
     date_naissance = serializers.DateField(required=False, allow_null=True)
     tel_parent = serializers.CharField(max_length=20, required=False, allow_blank=True)
-
+    niveau = serializers.CharField(max_length=20)
     # Champs spécifiques au prof (optionnel)
     specialite = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
@@ -151,6 +141,7 @@ class RegisterSerializer(serializers.Serializer):
                 **base_data,
                 date_naissance=validated_data.get("date_naissance"),
                 tel_parent=validated_data.get("tel_parent", ""),
+                niveau=validated_data.get("niveau","")
             )
         elif role == 'prof':
             user = Prof.objects.create(
@@ -575,11 +566,6 @@ class NoteUpdateSerializer(serializers.ModelSerializer):
         model = Note
         fields = ['valeur']
 
-    # def validate_valeur(self, value):
-    #     if value < 0 or value > 20:
-    #         raise serializers.ValidationError("La note doit être entre 0 et 20.")
-    #     return value
-
 class SessionSerializer(serializers.ModelSerializer):
     concours_nom = serializers.SerializerMethodField()
     concours_id = serializers.UUIDField(write_only=True)
@@ -682,3 +668,9 @@ class EleveSerializer(serializers.ModelSerializer):
             'niveau', 'date_naissance', 'tel_parent',
             'role', 'created_at'
         ]
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = '__all__'
+        read_only_fields = ['id','created_at']

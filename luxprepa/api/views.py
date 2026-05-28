@@ -170,4 +170,15 @@ class EleveDetailView(APIView):
         eleve = get_object_or_404(Eleve,id=id_eleve)
         serializer = EleveSerializer(eleve)
         return Response(serializer.data, status=status.HTTP_200_OK)
-        
+    
+class UsersListView(APIView):
+    def get(self, request):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role not in ('admin', 'prof'):
+            return reponse_admin_requis()
+
+        users = User.objects.all().order_by('nom')
+        serializer = EleveSerializer(users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)      

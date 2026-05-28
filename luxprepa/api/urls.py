@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     # Auth
-    InscriptionView, ConnexionView, ProfilView, DeconnexionView,EleveListView,EleveDetailView
+    InscriptionView, ConnexionView, ProfilView, DeconnexionView,EleveListView,EleveDetailView,UsersListView
 )
 from .concours_views import (
     ConcoursListView, ConcoursDetailView,
@@ -18,6 +18,9 @@ from .pwd_views import (ChangerMotDePasseView,MotDePasseOublieView,VerifierCodeR
 from .matiere_views import MatiereDetailView,MatiereListView
 from .matiere_concours_views import MatiereConcourDetailView,MatiereConcourListView,MatiereConcoursListView
 from .activite_views import ActiviteListView
+from .resultat_views import resultats_concours_public 
+
+
 urlpatterns = [
     # ── Auth ──
     path('auth/inscription/', InscriptionView.as_view(), name='inscription'),
@@ -63,4 +66,7 @@ urlpatterns = [
     path('activites/', ActiviteListView.as_view(), name='activite-list'),
     path('eleves/', EleveListView.as_view(), name='eleve-list'),
     path('eleves/<uuid:id_eleve>/', EleveDetailView.as_view(), name='eleve-detail'),
+    path('users/', UsersListView.as_view(), name='eleve-list'),
+
+    path('api/resultats-public/<uuid:session_id>/', resultats_concours_public, name='resultats-public'),
 ]
