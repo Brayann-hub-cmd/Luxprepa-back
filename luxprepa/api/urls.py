@@ -8,17 +8,14 @@ from .concours_views import (
     InscriptionListView, InscriptionDetailView, ValiderInscriptionView,
     PaiementListView,
 )
-
 from .notes_views import (
     NoteListView, NoteDetailView,
     SessionListView, SessionDetailView,
     AnnonceListView, AnnonceDetailView,
 )
-
 from .pre_inscription_views import (PreInscriptionView,ConfirmationSMSView,RenvoyerCodeView)
-
 from .pwd_views import (ChangerMotDePasseView,MotDePasseOublieView,VerifierCodeResetView,NouveauMotDePasseView)
-
+from .matiere_views import MatiereDetailView,MatiereListView
 urlpatterns = [
     # ── Auth ──
     path('auth/inscription/', InscriptionView.as_view(), name='inscription'),
@@ -35,6 +32,10 @@ urlpatterns = [
     path('auth/mot-de-passe-oublie/', MotDePasseOublieView.as_view()),
     path('auth/verifier-code-reset/', VerifierCodeResetView.as_view()),
     path('auth/nouveau-password/', NouveauMotDePasseView.as_view()),
+
+    path('matieres/',MatiereListView.as_view(),name='matiere-list'),
+    path('matieres/<uuid:id_matiere>/',MatiereDetailView.as_view(),name='matiere-detail'),
+
     # ── Concours ──
     path('concours/', ConcoursListView.as_view(), name='concours-list'),
     path('concours/<uuid:concours_id>/', ConcoursDetailView.as_view(), name='concours-detail'),

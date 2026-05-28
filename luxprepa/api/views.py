@@ -4,19 +4,12 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import InscriptionSerializer, ConnexionSerializer
-from .models import User
-
-
-# ───────────────────────────────────────────
-# UTILITAIRE : Décoder le token JWT
-# ───────────────────────────────────────────
-
+from .serializers import RegisterSerializer, ConnexionSerializer
+from .models import User,Eleve,Prof
+from .permissions import IsAdminRole
+from rest_framework.parsers import MultiPartParser,FormParser
 def verifier_token(request):
-    """
-    Extrait et vérifie le token JWT depuis le header Authorization.
-    Retourne le payload si valide, None sinon.
-    """
+    
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         return None
@@ -29,29 +22,11 @@ def verifier_token(request):
     except jwt.InvalidTokenError:
         return None
 
-
-# ───────────────────────────────────────────
-# INSCRIPTION
-# ───────────────────────────────────────────
-
 class InscriptionView(APIView):
-    """
-    POST /api/auth/inscription/
-    Corps attendu :
-    {
-        "nom": "Kamga",
-        "prenom": "Brayann",
-        "telephone": "690000000",
-        "password": "monpassword",
-        "role": "eleve",
-        "date_naissance": "2000-01-01",  # si eleve
-        "tel_parent": "670000000",        # si eleve (optionnel)
-        "specialite": "Mathématiques"     # si prof
-    }
-    """
-
+    permission_classes = [IsAdminRole]
+    parser_classes = [MultiPartParser, FormParser]
     def post(self, request):
-        serializer = InscriptionSerializer(data=request.data)
+        serializer = RegisterSerializer(data=request.data)
 
         if not serializer.is_valid():
             return Response(
@@ -59,35 +34,17 @@ class InscriptionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # create() retourne (user, code)
         user, code = serializer.save()
 
-        # TODO: Stocker le code en base (modèle CodeConfirmation) pour vérification
-        # Pour l'instant on le retourne dans la réponse (à retirer en production !)
         return Response(
             {
-                "message": "Inscription réussie. Un code de confirmation a été envoyé par SMS.",
-                "user_id": str(user.id),
-                "code_debug": code,  # ⚠️ À RETIRER EN PRODUCTION
+                "message": f"Inscription réussie. {user.prenom} {user.nom}",
             },
             status=status.HTTP_201_CREATED
         )
 
-
-# ───────────────────────────────────────────
-# CONNEXION
-# ───────────────────────────────────────────
-
 class ConnexionView(APIView):
-    """
-    POST /api/auth/connexion/
-    Corps attendu :
-    {
-        "telephone": "690000000",
-        "password": "monpassword"
-    }
-    """
-
+   
     def post(self, request):
         serializer = ConnexionSerializer(data=request.data)
 
@@ -109,17 +66,7 @@ class ConnexionView(APIView):
             status=status.HTTP_200_OK
         )
 
-
-# ───────────────────────────────────────────
-# PROFIL (route protégée par JWT)
-# ───────────────────────────────────────────
-
 class ProfilView(APIView):
-    """
-    GET /api/auth/profil/
-    Header requis : Authorization: Bearer <token>
-    """
-
     def get(self, request):
         payload = verifier_token(request)
 
@@ -137,6 +84,36 @@ class ProfilView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        if user.role == 'eleve':
+            eleve = Eleve.objects.get(id=user.id)
+            return Response(
+                {
+                    "id": str(eleve.id),
+                    "nom": eleve.nom,
+                    "prenom": eleve.prenom,
+                    "telephone": eleve.telephone,
+                    "created_at": eleve.created_at,
+                    "date_naissance": eleve.date_naissance,
+                    "tel_parent": eleve.tel_parent,
+                    "niveau":eleve.niveau,
+                    "role":user.role
+                }
+            )
+        
+        if user.role == 'prof':
+            prof = Prof.objects.get(id=user.id)
+            return Response(
+                {
+                    "id": str(prof.id),
+                    "nom": prof.nom,
+                    "prenom": prof.prenom,
+                    "telephone": prof.telephone,
+                    "created_at": prof.created_at,
+                    "specialite": prof.specialite,
+                    "role":user.role
+                }
+            )
+
         return Response(
             {
                 "id": str(user.id),
@@ -149,19 +126,7 @@ class ProfilView(APIView):
             status=status.HTTP_200_OK
         )
 
-
-# ───────────────────────────────────────────
-# DÉCONNEXION
-# ───────────────────────────────────────────
-
 class DeconnexionView(APIView):
-    """
-    POST /api/auth/deconnexion/
-    Côté backend JWT, la déconnexion est gérée côté frontend
-    (suppression du token en localStorage).
-    Cette vue sert juste à confirmer la déconnexion.
-    """
-
     def post(self, request):
         payload = verifier_token(request)
 
@@ -172,6 +137,6 @@ class DeconnexionView(APIView):
             )
 
         return Response(
-            {"message": "Déconnexion réussie. Supprimez le token côté client."},
+            {"message": "Déconnexion réussie."},
             status=status.HTTP_200_OK
         )

@@ -23,7 +23,6 @@ def verifier_token(request):
 
 
 def get_user_from_token(request):
-    """Retourne l'objet User depuis le token JWT"""
     payload = verifier_token(request)
     if payload is None:
         return None
