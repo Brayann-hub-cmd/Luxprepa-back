@@ -46,3 +46,5 @@ class IsAdminOrProfReadOnly(BasePermission):
         if request.method == 'GET':
             return request.user.is_authenticated  # prof peut lire
         return request.user.is_authenticated and request.user.role == 'admin'
+
+

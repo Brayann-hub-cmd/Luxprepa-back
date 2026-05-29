@@ -82,7 +82,6 @@ class Prof(User):
     def noter(self):
         pass
 
-
 class InscriptionTemporaire(models.Model):
     ROLE_CHOICES = [
         ('admin', 'Admin'),
@@ -136,7 +135,6 @@ class Matiere(models.Model):
     def __str__(self):
         return self.nom
 
-
 class Concours(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nom = models.CharField(max_length=200)
@@ -161,7 +159,6 @@ class Concours(models.Model):
     def concours(self):
         pass
 
-
 class MatiereConcours(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     matiere = models.ForeignKey(Matiere, on_delete=models.CASCADE, related_name='matiere_concours')
@@ -174,7 +171,6 @@ class MatiereConcours(models.Model):
 
     def __str__(self):
         return f"{self.matiere.nom} - {self.concours.nom} (coeff: {self.coefficient})"
-
 
 class Session(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -194,7 +190,6 @@ class Session(models.Model):
     def __str__(self):
         return f"{self.nom} ({self.date})"
 
-
 class Inscription(models.Model):
     STATUS_CHOICES = [
         ('en_attente', 'En attente'),
@@ -204,7 +199,7 @@ class Inscription(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    eleve = models.ForeignKey(Eleve, on_delete=models.CASCADE, related_name='inscriptions')
+    eleve = models.ForeignKey(User, on_delete=models.CASCADE, related_name='inscriptions')
     concours = models.ForeignKey(Concours, on_delete=models.CASCADE, related_name='inscriptions')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
     created_at = models.DateTimeField(auto_now_add=True)

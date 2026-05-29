@@ -3,11 +3,12 @@ import jwt
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status,generics
 from .serializers import RegisterSerializer, ConnexionSerializer,EleveSerializer,UserSerializer
 from .models import User,Eleve,Prof
 from .permissions import IsAdminRole
 from rest_framework.parsers import MultiPartParser,FormParser
+from .serializers import InscriptionAdminSerializer
 from .concours_views import get_user_from_token,reponse_non_autorise,reponse_admin_requis,get_object_or_404
 def verifier_token(request):
     
@@ -251,4 +252,16 @@ class UsersDetailView(APIView):
         return Response(
             {"message": "Utilisateur supprimé avec succès."},
             status=status.HTTP_200_OK
+        )
+
+class InscriptionAdminCreateView(generics.CreateAPIView):
+    serializer_class = InscriptionAdminSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        inscription = serializer.save()
+        return Response(
+            {"message": "Inscription réussie", "id": str(inscription.id)},
+            status=status.HTTP_201_CREATED
         )

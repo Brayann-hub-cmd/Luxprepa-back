@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     # Auth
-    InscriptionView, ConnexionView, ProfilView, DeconnexionView,EleveListView,EleveDetailView,UsersListView,UsersDetailView
+    InscriptionView, ConnexionView, ProfilView, DeconnexionView,EleveListView,EleveDetailView,UsersListView,UsersDetailView,
+    InscriptionAdminCreateView
 )
 from .concours_views import (
     ConcoursListView, ConcoursDetailView,
@@ -68,6 +69,6 @@ urlpatterns = [
     path('eleves/<uuid:id_eleve>/', EleveDetailView.as_view(), name='eleve-detail'),
     path('users/', UsersListView.as_view(), name='eleve-list'),
     path('users/<uuid:id_user>/', UsersDetailView.as_view(), name='eleve-list'),
-
+    path('admin/inscriptions/', InscriptionAdminCreateView.as_view(), name='admin-inscription-create'),
     path('api/resultats-public/<uuid:session_id>/', resultats_concours_public, name='resultats-public'),
 ]

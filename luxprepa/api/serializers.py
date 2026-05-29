@@ -90,7 +90,7 @@ def generer_token_jwt(user):
     payload = {
         "user_id": str(user.id),
         "role": user.role,
-        "exp": datetime.utcnow() + timedelta(days=7),
+        "exp": datetime.utcnow() + timedelta(hours=24),
         "iat": datetime.utcnow(),
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
@@ -392,9 +392,16 @@ class InscriptionSerializer(serializers.ModelSerializer):
         return f"{obj.eleve.prenom} {obj.eleve.nom}"
     
     def create(self, validated_data):
-        eleve = self.context['request'].user_obj 
+        user = self.context['request'].user_obj 
         concours_id = validated_data['concours_id']
-
+        print(f"type de eleve: {type(user)}") 
+        # Récupération de l'instance Eleve
+        try:
+            eleve = Eleve.objects.get(user_ptr=user)
+            print(f"type de eleve après conversion: {type(eleve)}")
+        except Eleve.DoesNotExist:
+            raise serializers.ValidationError("L'utilisateur sélectionné n'est pas un élève.")
+        
         # Vérifier que l'élève n'est pas déjà inscrit
         if Inscription.objects.filter(eleve=eleve, concours_id=concours_id).exists():
             raise serializers.ValidationError("Vous êtes déjà inscrit à ce concours.")
@@ -677,3 +684,41 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = '__all__'
         read_only_fields = ['id','created_at']
+
+class InscriptionAdminSerializer(serializers.ModelSerializer):
+    eleve_id = serializers.UUIDField(write_only=True)
+    concours_id = serializers.UUIDField(write_only=True)
+
+    class Meta:
+        model = Inscription
+        fields = ['eleve_id', 'concours_id']
+
+    def create(self, validated_data):
+        eleve_id = validated_data['eleve_id']
+        concours_id = validated_data['concours_id']
+
+        # Récupérer l'utilisateur
+        try:
+            user = User.objects.get(id=eleve_id)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"eleve_id": "Utilisateur introuvable."})
+
+        # Vérifier que c'est un élève (optionnel)
+        if user.role != 'eleve':
+            raise serializers.ValidationError({"eleve_id": "Cet utilisateur n'est pas un élève."})
+
+        # Récupérer le concours
+        try:
+            concours = Concours.objects.get(id=concours_id)
+        except Concours.DoesNotExist:
+            raise serializers.ValidationError({"concours_id": "Concours introuvable."})
+
+        # Vérifier doublon
+        if Inscription.objects.filter(eleve=user, concours=concours).exists():
+            raise serializers.ValidationError("Cet élève est déjà inscrit à ce concours.")
+
+        return Inscription.objects.create(
+            eleve=user,
+            concours=concours,
+            status='en_attente'
+        )
