@@ -241,6 +241,7 @@ class Paiement(models.Model):
 
     class Meta:
         db_table = 'paiements'
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"Paiement {self.montant} FCFA - {self.get_statut_display()}"

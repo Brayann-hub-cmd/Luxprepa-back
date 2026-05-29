@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import RegisterSerializer, ConnexionSerializer,EleveSerializer
+from .serializers import RegisterSerializer, ConnexionSerializer,EleveSerializer,UserSerializer
 from .models import User,Eleve,Prof
 from .permissions import IsAdminRole
 from rest_framework.parsers import MultiPartParser,FormParser
@@ -181,4 +181,74 @@ class UsersListView(APIView):
 
         users = User.objects.all().order_by('nom')
         serializer = EleveSerializer(users, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)      
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role != 'admin':
+            return reponse_admin_requis()
+        serializer = RegisterSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                {"erreurs": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user, code = serializer.save()
+
+        return Response(
+            {
+                "message": f"Inscription réussie. {user.prenom} {user.nom}",
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+class UsersDetailView(APIView):
+    def get(self, request, id_user):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role != 'admin':
+            return reponse_admin_requis()
+        eleve = get_object_or_404(User,id=id_user)
+        serializer = UserSerializer(eleve)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def put(self, request, id_user):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role != 'admin':
+            return reponse_admin_requis()
+        user_selected = get_object_or_404(User, id=id_user)
+        serializer = UserSerializer(
+            user_selected,
+            data=request.data,
+            partial=True  # permet de ne modifier que certains champs
+        )
+        if not serializer.is_valid():
+            return Response(
+                {"erreurs": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        eleve = serializer.save()
+        return Response( UserSerializer(eleve).data,
+            status=status.HTTP_200_OK
+        )
+    
+    def delete(self, request, id_user):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role != 'admin':
+            return reponse_admin_requis()
+
+        eleve = get_object_or_404(User, id=id_user)
+        eleve.delete()
+        return Response(
+            {"message": "Utilisateur supprimé avec succès."},
+            status=status.HTTP_200_OK
+        )

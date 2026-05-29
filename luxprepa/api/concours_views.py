@@ -153,7 +153,6 @@ class InscriptionListView(APIView):
         serializer = InscriptionSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-
     def post(self, request):
         user = get_user_from_token(request)
         if user is None:
@@ -295,8 +294,17 @@ class PaiementListView(APIView):
                 {"erreurs": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        montant = request.data.get('montant')
+        inscription_id = request.data.get('inscription_id')
+        inscription = get_object_or_404(Inscription, id=inscription_id)
 
         paiement = serializer.save()
+
+        Activite.objects.create(
+            type_act='paiement',
+            message = f"Paiement reçu - {inscription.eleve.nom} {montant} Fcfa"
+        )
         return Response(
             {
                 "message": "Versement enregistré avec succès.",
