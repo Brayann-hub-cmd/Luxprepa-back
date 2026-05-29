@@ -5,7 +5,7 @@ from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Note, Session, Annonce, User, Eleve, Prof, Admin, Inscription, Paiement
+from .models import Note, Session, Annonce, User, Eleve, Prof, Admin, Inscription, Activite
 from .serializers import NoteSerializer, NoteUpdateSerializer, SessionSerializer, AnnonceSerializer
 
 def verifier_token(request):
@@ -91,6 +91,10 @@ class NoteListView(APIView):
         # Seuls les profs et admins peuvent affecter des notes
         if user.role not in ('prof', 'admin'):
             return reponse_acces_refuse()
+        
+        eleve = request.data.get('eleve_id')
+        note = request.data.get('valeur')
+        matiere = request.data.get('matiere_concours_id')
 
         serializer = NoteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -100,6 +104,10 @@ class NoteListView(APIView):
             )
 
         note = serializer.save()
+        Activite.objects.create(
+            type_act='note',
+            message = f"Note ajoutée - {eleve.prenom} {eleve.nom} . {matiere}: {note}"
+        )
         return Response(
             {
                 "message": "Note affectée avec succès.",
@@ -298,7 +306,7 @@ class AnnonceListView(APIView):
                 {"erreur": "Profil admin introuvable."},
                 status=status.HTTP_404_NOT_FOUND
             )
-
+        titre = request.data.get('titre')
         serializer = AnnonceSerializer(data=request.data, context={'admin': admin,'request':request})
         if not serializer.is_valid():
             return Response(
@@ -307,6 +315,10 @@ class AnnonceListView(APIView):
             )
 
         annonce = serializer.save()
+        Activite.objects.create(
+            type_act='annonce',
+            message = f"Annonce publiée - {titre}"
+        )
         return Response(
             {
                 "message": "Annonce créée avec succès.",

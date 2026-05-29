@@ -409,13 +409,16 @@ class PaiementSerializer(serializers.ModelSerializer):
     inscription_id = serializers.UUIDField(write_only=True)
     total_paye = serializers.SerializerMethodField()
     reste_a_payer = serializers.SerializerMethodField()
-
+    eleve_nom = serializers.CharField(source='inscription.eleve.nom', read_only=True)
+    eleve_prenom = serializers.CharField(source='inscription.eleve.prenom', read_only=True)
+    concours_nom = serializers.CharField(source='inscription.concours.nom', read_only=True)
     class Meta:
         model = Paiement
         fields = [
             'id', 'inscription_id', 'montant',
             'statut', 'created_at',
             'total_paye', 'reste_a_payer',
+            'eleve_nom', 'eleve_prenom', 'concours_nom'
         ]
         read_only_fields = ['statut', 'created_at']
 
