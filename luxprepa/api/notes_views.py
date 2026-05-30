@@ -5,7 +5,7 @@ from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Note, Session, Annonce, User, Eleve, Prof, Admin, Inscription, Activite
+from .models import Note, Session, Annonce, User, Eleve, MatiereConcours, Admin, Inscription, Activite
 from .serializers import NoteSerializer, NoteUpdateSerializer, SessionSerializer, AnnonceSerializer
 
 def verifier_token(request):
@@ -19,7 +19,6 @@ def verifier_token(request):
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return None
 
-
 def get_user_from_token(request):
     payload = verifier_token(request)
     if payload is None:
@@ -29,20 +28,17 @@ def get_user_from_token(request):
     except User.DoesNotExist:
         return None
 
-
 def reponse_non_autorise():
     return Response(
         {"erreur": "Token invalide ou expiré."},
         status=status.HTTP_401_UNAUTHORIZED
     )
 
-
 def reponse_acces_refuse():
     return Response(
         {"erreur": "Vous n'avez pas les droits pour effectuer cette action."},
         status=status.HTTP_403_FORBIDDEN
     )
-
 
 def eleve_a_tout_paye(eleve):
     inscriptions = Inscription.objects.filter(eleve=eleve, status='validee')
@@ -93,7 +89,6 @@ class NoteListView(APIView):
             return reponse_acces_refuse()
         
         eleve = request.data.get('eleve_id')
-        note = request.data.get('valeur')
         matiere = request.data.get('matiere_concours_id')
 
         serializer = NoteSerializer(data=request.data)
@@ -104,9 +99,16 @@ class NoteListView(APIView):
             )
 
         note = serializer.save()
+        try:
+            eleve_obj = Eleve.objects.get(id=eleve)
+            matiere_obj = MatiereConcours.objects.get(id=matiere)
+            valeur = request.data.get('valeur')
+            msg = f"Note ajoutée- {eleve_obj.nom} {eleve_obj.prenom} . {matiere_obj.matiere.nom}: {valeur}"
+        except:
+            msg=f"Note ajoutée- Elève inconnu . Matière inconnu: {note}"
         Activite.objects.create(
             type_act='note',
-            message = f"Note ajoutée - {eleve.prenom} {eleve.nom} . {matiere}: {note}"
+            message = msg
         )
         return Response(
             {

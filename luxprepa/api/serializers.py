@@ -570,7 +570,6 @@ class NoteSerializer(serializers.ModelSerializer):
         validated_data.pop('matiere_concours_id')
         return Note.objects.create(**validated_data)
 
-
 class NoteUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Note
@@ -655,7 +654,7 @@ class ActiviteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Activite
-        fields = ['id', 'type', 'message', 'created_at', 'temps']
+        fields = ['id', 'type_act', 'message', 'created_at', 'temps']
 
     def get_temps(self, obj) -> str:
         from django.utils import timezone
