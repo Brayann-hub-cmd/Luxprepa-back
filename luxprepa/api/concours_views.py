@@ -21,7 +21,6 @@ def verifier_token(request):
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return None
 
-
 def get_user_from_token(request):
     payload = verifier_token(request)
     if payload is None:
@@ -31,13 +30,11 @@ def get_user_from_token(request):
     except User.DoesNotExist:
         return None
 
-
 def reponse_non_autorise():
     return Response(
         {"erreur": "Token invalide ou expiré. Veuillez vous reconnecter."},
         status=status.HTTP_401_UNAUTHORIZED
     )
-
 
 def reponse_admin_requis():
     return Response(
@@ -74,7 +71,6 @@ class ConcoursListView(APIView):
             },
             status=status.HTTP_201_CREATED
         )
-
 
 class ConcoursDetailView(APIView):
 
@@ -195,7 +191,6 @@ class InscriptionListView(APIView):
             status=status.HTTP_201_CREATED
         )
 
-
 class InscriptionDetailView(APIView):
     def get(self, request, inscription_id):
         user = get_user_from_token(request)
@@ -234,7 +229,6 @@ class InscriptionDetailView(APIView):
             {"message": "Inscription annulée."},
             status=status.HTTP_200_OK
         )
-
 
 class ValiderInscriptionView(APIView):
 

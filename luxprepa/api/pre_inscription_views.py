@@ -14,18 +14,8 @@ from .models import (
 )
 from .serializers import envoyer_sms, generer_token_jwt
 
-
-# ───────────────────────────────────────────
-# UTILITAIRES
-# ───────────────────────────────────────────
-
 def generer_code_sms():
     return str(random.randint(100000, 999999))
-
-
-# ───────────────────────────────────────────
-# SERIALIZER ÉTAPE 1 — Envoi des données
-# ───────────────────────────────────────────
 
 class PreInscriptionSerializer(serializers.Serializer):
     nom = serializers.CharField(max_length=100)
@@ -166,11 +156,6 @@ class ConfirmationSMSSerializer(serializers.Serializer):
 
         return user, token
 
-
-# ───────────────────────────────────────────
-# VUE ÉTAPE 1 — Pré-inscription
-# ───────────────────────────────────────────
-
 class PreInscriptionView(APIView):
     def post(self, request):
         serializer = PreInscriptionSerializer(data=request.data)
@@ -221,15 +206,6 @@ class ConfirmationSMSView(APIView):
         )
 
 class RenvoyerCodeView(APIView):
-    """
-    POST /api/auth/renvoyer-code/
-    Génère un nouveau code et le renvoie par SMS.
-
-    Corps :
-    {
-        "telephone": "690000000"
-    }
-    """
 
     def post(self, request):
         telephone = request.data.get('telephone')

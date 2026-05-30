@@ -5,7 +5,6 @@ from .serializers import ActiviteSerializer
 from .concours_views import get_user_from_token,reponse_non_autorise,reponse_admin_requis
 from rest_framework.views import APIView
 
-
 class ActiviteListView(APIView):
 
     def get(self, request):

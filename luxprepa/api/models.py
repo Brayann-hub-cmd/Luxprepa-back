@@ -211,7 +211,6 @@ class Inscription(models.Model):
     def __str__(self):
         return f"{self.eleve} -> {self.concours} ({self.status})"
 
-
 class Paiement(models.Model):
     STATUT_CHOICES = [
         ('en_attente', 'En attente'),
@@ -264,7 +263,6 @@ class Paiement(models.Model):
 
         # Mettre à jour sans rappeler save() pour éviter la récursion
         Paiement.objects.filter(id=self.id).update(statut=nouveau_statut)
-
 
 class Annonce(models.Model):
     TYPE_CHOICES = [

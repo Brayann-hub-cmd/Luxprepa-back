@@ -118,7 +118,6 @@ class NoteListView(APIView):
             status=status.HTTP_201_CREATED
         )
 
-
 class NoteDetailView(APIView):
     def get(self, request, note_id):
         user = get_user_from_token(request)
@@ -176,6 +175,7 @@ class NoteDetailView(APIView):
             {"message": "Note supprimée avec succès."},
             status=status.HTTP_200_OK
         )
+
 class SessionListView(APIView):
 
     def get(self, request):
@@ -209,7 +209,6 @@ class SessionListView(APIView):
             },
             status=status.HTTP_201_CREATED
         )
-
 
 class SessionDetailView(APIView):
 
@@ -328,7 +327,6 @@ class AnnonceListView(APIView):
             },
             status=status.HTTP_201_CREATED
         )
-
 
 class AnnonceDetailView(APIView):
 
