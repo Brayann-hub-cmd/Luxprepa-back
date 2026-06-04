@@ -11,14 +11,8 @@ from rest_framework import status
 from .models import User, InscriptionTemporaire
 from .serializers import envoyer_sms
 
-
-# ───────────────────────────────────────────
-# UTILITAIRES
-# ───────────────────────────────────────────
-
 def generer_code_sms():
     return str(random.randint(100000, 999999))
-
 
 def get_user_from_token(request):
     auth_header = request.headers.get('Authorization')
@@ -31,17 +25,11 @@ def get_user_from_token(request):
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, User.DoesNotExist):
         return None
 
-
 def reponse_non_autorise():
     return Response(
         {"erreur": "Token invalide ou expiré."},
         status=status.HTTP_401_UNAUTHORIZED
     )
-
-
-# ════════════════════════════════════════════════════════
-# CAS 1 — CHANGER MOT DE PASSE (utilisateur connecté)
-# ════════════════════════════════════════════════════════
 
 class ChangerMotDePasseSerializer(serializers.Serializer):
     ancien_password = serializers.CharField(write_only=True)
@@ -63,20 +51,7 @@ class ChangerMotDePasseSerializer(serializers.Serializer):
 
         return data
 
-
 class ChangerMotDePasseView(APIView):
-    """
-    POST /api/auth/changer-password/
-    Accès : Connecté (token requis)
-
-    Corps :
-    {
-        "ancien_password": "monancienpassword",
-        "nouveau_password": "monnouveau123",
-        "confirmer_password": "monnouveau123"
-    }
-    """
-
     def post(self, request):
         user = get_user_from_token(request)
         if user is None:
@@ -106,13 +81,6 @@ class ChangerMotDePasseView(APIView):
             {"message": "Mot de passe modifié avec succès."},
             status=status.HTTP_200_OK
         )
-
-
-# ════════════════════════════════════════════════════════
-# CAS 2 — MOT DE PASSE OUBLIÉ (utilisateur non connecté)
-# ════════════════════════════════════════════════════════
-
-# ── ÉTAPE 1 : Demander le code SMS ──
 
 class MotDePasseOublieView(APIView):
     """
@@ -173,9 +141,6 @@ class MotDePasseOublieView(APIView):
             },
             status=status.HTTP_200_OK
         )
-
-
-# ── ÉTAPE 2 : Vérifier le code SMS ──
 
 class VerifierCodeResetView(APIView):
     """
@@ -249,9 +214,6 @@ class VerifierCodeResetView(APIView):
             status=status.HTTP_200_OK
         )
 
-
-# ── ÉTAPE 3 : Définir le nouveau mot de passe ──
-
 class NouveauMotDePasseSerializer(serializers.Serializer):
     telephone = serializers.CharField(max_length=20)
     reset_token = serializers.CharField()
@@ -265,20 +227,7 @@ class NouveauMotDePasseSerializer(serializers.Serializer):
             })
         return data
 
-
 class NouveauMotDePasseView(APIView):
-    """
-    POST /api/auth/nouveau-password/
-    Accès : Public (avec reset_token obtenu à l'étape 2)
-
-    Corps :
-    {
-        "telephone": "690000000",
-        "reset_token": "uuid-reçu-étape-2",
-        "nouveau_password": "monnouveau123",
-        "confirmer_password": "monnouveau123"
-    }
-    """
 
     def post(self, request):
         serializer = NouveauMotDePasseSerializer(data=request.data)

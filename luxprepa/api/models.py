@@ -43,14 +43,12 @@ class User(models.Model):
     def signup(self):
         pass
 
-
 class Admin(User):
     class Meta:
         db_table = 'administrateurs'
 
     def __str__(self):
         return f"Admin: {self.prenom} {self.nom}"
-
 
 class Eleve(User):
     NIVEAU_CHOICES = [
@@ -68,7 +66,6 @@ class Eleve(User):
 
     def composer(self):
         pass
-
 
 class Prof(User):
     specialite = models.CharField(max_length=100)
@@ -328,21 +325,18 @@ class Activite(models.Model):
     def __str__(self):
         return f'{self.type} - {self.message}'
     
-class LienResultat(models.Model):
-    token = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    eleve = models.ForeignKey(Eleve, on_delete=models.CASCADE, related_name='liens_resultats')
-    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='liens_resultats')
-    date_creation = models.DateTimeField(auto_now_add=True)
-    date_expiration = models.DateTimeField(null=True, blank=True)
+class LensResultat(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        'Session',
+        on_delete=models.CASCADE,
+        related_name='liens'
+    )
+    token = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('eleve', 'session')
-        db_table = 'liens_resultats'
-
-    def est_valide(self):
-        if self.date_expiration and timezone.now() > self.date_expiration:
-            return False
-        return True
+        db_table = 'lens_resultats'
 
     def __str__(self):
-        return f"Lien {self.eleve} - {self.session}"
+        return f"Lien résultats — {self.session.nom}"

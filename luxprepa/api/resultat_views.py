@@ -1,55 +1,96 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+import hashlib
+from collections import defaultdict
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Note, Inscription, Session, MatiereConcours
+from rest_framework import status
+from .models import Session, Note, LensResultat, Eleve
+from .concours_views import get_user_from_token, reponse_non_autorise, reponse_admin_requis
+from django.conf import settings
 
-@api_view(['GET'])
-def resultats_concours_public(request, session_id):
-    try:
-        session = Session.objects.get(id=session_id)
-    except Session.DoesNotExist:
-        return Response({"erreur": "Session introuvable"}, status=404)
+class PublierResultatsView(APIView):
 
-    # Même code que votre vue authentifiée (resultats_concours)
-    matieres_concours = MatiereConcours.objects.filter(concours=session.concours)
-    matiere_noms = [mc.matiere.nom for mc in matieres_concours]
-    matiere_ids = {mc.id: mc.matiere.nom for mc in matieres_concours}
+    def post(self, request, session_id):
+        user = get_user_from_token(request)
+        if user is None:
+            return reponse_non_autorise()
+        if user.role not in ('admin', 'prof'):
+            return reponse_admin_requis()
 
-    inscriptions = Inscription.objects.filter(session=session).select_related('eleve')
-    notes = Note.objects.filter(session=session).select_related('eleve', 'matiere_concours__matiere')
+        session = get_object_or_404(Session, id=session_id)
 
-    notes_par_eleve = {}
-    for note in notes:
-        eleve_id = note.eleve.id
-        if eleve_id not in notes_par_eleve:
-            notes_par_eleve[eleve_id] = {}
-        matiere_nom = matiere_ids.get(note.matiere_concours.id, "Inconnue")
-        notes_par_eleve[eleve_id][matiere_nom] = note.valeur
+        # Générer un token unique basé sur session_id
+        token = hashlib.sha256(
+            f"{session_id}-{session.nom}".encode()
+        ).hexdigest()[:32]
 
-    eleves_data = []
-    for insc in inscriptions:
-        eleve = insc.eleve
-        notes_eleve = {nom: None for nom in matiere_noms}
-        if eleve.id in notes_par_eleve:
-            notes_eleve.update(notes_par_eleve[eleve.id])
+        # Créer ou récupérer le lien
+        lien, _ = LensResultat.objects.get_or_create(
+            session=session,
+            defaults={'token': token}
+        )
 
-        total = sum(v for v in notes_eleve.values() if v is not None)
-        eleves_data.append({
-            "nom": eleve.nom,
-            "prenom": eleve.prenom,
-            "notes": notes_eleve,
-            "total": total,
-            "rang": 0
-        })
+        lien_url = f"{settings.BACKOFFICE_URL}/resultats/{lien.token}"
 
-    eleves_data.sort(key=lambda e: (e['nom'].lower(), e['prenom'].lower()))
-    eleves_tries_par_total = sorted(eleves_data, key=lambda e: e['total'], reverse=True)
-    for i, e in enumerate(eleves_tries_par_total, 1):
-        e['rang'] = i
-    eleves_data.sort(key=lambda e: (e['nom'].lower(), e['prenom'].lower()))
+        return Response({
+            "message": "Résultats publiés avec succès.",
+            "lien": lien_url,
+            "token": lien.token,
+        }, status=status.HTTP_200_OK)
 
-    return Response({
-        "session": {"id": session.id, "nom": session.nom},
-        "matieres": matiere_noms,
-        "eleves": eleves_data
-    })
+
+class ResultatsPublicView(APIView):
+
+    def get(self, request, token):
+        lien = get_object_or_404(LensResultat, token=token)
+        session = lien.session
+
+        # Récupérer toutes les notes de cette session
+        notes = Note.objects.filter(
+            session=session
+        ).select_related('eleve', 'matiere_concours__matiere')
+
+        # Grouper par élève
+        eleves_notes = defaultdict(list)
+        for note in notes:
+            eleves_notes[note.eleve.id].append({
+                'matiere': note.matiere_concours.matiere.nom,
+                'coefficient': note.matiere_concours.coefficient,
+                'valeur': note.valeur,
+            })
+
+        # Calculer moyenne pondérée pour chaque élève
+        resultats = []
+        for eleve_id, notes_list in eleves_notes.items():
+            try:
+                eleve_obj = Eleve.objects.get(id=eleve_id)
+                nom = f"{eleve_obj.prenom} {eleve_obj.nom}"
+            except Eleve.DoesNotExist:
+                nom = "Inconnu"
+
+            total_points = sum(n['valeur'] * n['coefficient'] for n in notes_list)
+            total_coeff = sum(n['coefficient'] for n in notes_list)
+            moyenne = round(total_points / total_coeff, 2) if total_coeff > 0 else 0
+
+            resultats.append({
+                'eleve_id': str(eleve_id),
+                'eleve_nom': nom,
+                'notes': notes_list,
+                'moyenne': moyenne,
+            })
+
+        # Trier par moyenne décroissante et ajouter le rang
+        resultats.sort(key=lambda x: x['moyenne'], reverse=True)
+        for i, r in enumerate(resultats):
+            r['rang'] = i + 1
+
+        return Response({
+            'session': {
+                'id': str(session.id),
+                'nom': session.nom,
+                'date': session.date,
+                'concours_nom': session.concours.nom if session.concours else '',
+            },
+            'resultats': resultats,
+            'total_eleves': len(resultats),
+        }, status=status.HTTP_200_OK)

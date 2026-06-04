@@ -18,10 +18,8 @@ from .pre_inscription_views import (PreInscriptionView,ConfirmationSMSView,Renvo
 from .pwd_views import (ChangerMotDePasseView,MotDePasseOublieView,VerifierCodeResetView,NouveauMotDePasseView)
 from .matiere_views import MatiereDetailView,MatiereListView
 from .matiere_concours_views import MatiereConcourDetailView,MatiereConcourListView,MatiereConcoursListView
-from .activite_views import ActiviteListView
-from .resultat_views import resultats_concours_public 
-
-
+from .activite_views import ActiviteListView 
+from .resultat_views import PublierResultatsView, ResultatsPublicView
 urlpatterns = [
     # ── Auth ──
     path('auth/inscription/', InscriptionView.as_view(), name='inscription'),
@@ -70,5 +68,6 @@ urlpatterns = [
     path('users/', UsersListView.as_view(), name='eleve-list'),
     path('users/<uuid:id_user>/', UsersDetailView.as_view(), name='eleve-list'),
     path('admin/inscriptions/', InscriptionAdminCreateView.as_view(), name='admin-inscription-create'),
-    path('api/resultats-public/<uuid:session_id>/', resultats_concours_public, name='resultats-public'),
+    path('sessions/<uuid:session_id>/publier/', PublierResultatsView.as_view(), name='publier-resultats'),
+    path('resultats/<str:token>/', ResultatsPublicView.as_view(), name='resultats-public'),
 ]
