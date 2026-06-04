@@ -147,5 +147,5 @@ SIMPLE_JWT = {
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-SMS_MODE = env('SMS_MODE',default='dev')
-BACKOFFICE_URL = env('BACKOFFICE_URL')
+SMS_MODE = os.getenv('SMS_MODE', 'dev')
+BACKOFFICE_URL = os.getenv('BACKOFFICE_URL', 'http://localhost:5173')
