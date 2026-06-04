@@ -1,0 +1,1 @@
+web: gunicorn luxprepa.wsgi --log-file -
