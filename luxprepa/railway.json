@@ -3,7 +3,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "gunicorn nom_de_ton_projet.wsgi --log-file -",
+    "startCommand": "gunicorn luxprepa.wsgi --log-file -",
     "restartPolicyType": "ON_FAILURE"
   }
 }
