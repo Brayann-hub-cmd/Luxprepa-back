@@ -3,7 +3,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "gunicorn luxprepa.wsgi --log-file -",
+    "startCommand": "python manage.py collectstatic --noinput && gunicorn luxprepa.wsgi --log-file -",
     "restartPolicyType": "ON_FAILURE"
   }
 }
